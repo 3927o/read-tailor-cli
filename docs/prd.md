@@ -65,17 +65,17 @@ pandoc name.epub -f epub -t html -s --embed-resources -o name.raw.html
 - 注释引用与注释正文的大致组织方式
 - 明显异常或难以可靠识别的区域
 
-AI 在这一步**默认不直接阅读完整正文文本**，而是仅读取一份由程序预处理出来的结构视图。该结构视图只包含：
+AI 在这一步**默认不直接阅读完整正文文本**，而是仅读取一份由程序预处理出来的结构视图 XML。该结构视图只包含：
 
 - 标签树
 - 标签属性
-- 每个标签文本内容的前 10 个字符
+- 每个标签文本内容的前 30 个字符；其中 `h1`/`h2`/`h3`/`h4` 标签保留完整文本（标题通常较短，完整保留有助于 AI 判断章节结构）
 
 这一步的目的不是让 AI 直接手工改 HTML，而是让 AI 基于这些理解生成一个**规范化处理脚本**，再由脚本把 `book.raw.html` 转成统一格式的 `book.normalized.html`。
 
 同时输出：
 
-- `raw_outline.json`：供 AI 使用的结构视图快照
+- `raw_outline.xml`：供 AI 使用的结构视图快照
 - `normalize.py`：AI 生成的规范化脚本
 - `book.normalized.html`：规范化后的标准 HTML
 - `structure.json`：标准化后的结构摘要
@@ -229,7 +229,6 @@ AI 生成一个 Python 脚本，对标准化 HTML 进行进一步处理，得到
 
 - `structure.json`、`notes.json` 均允许 AI 或脚本按需要添加扩展字段
 - 只要求每个 JSON 文件包含该步骤继续往后所必需的最小信息
-- 后续步骤应优先依赖“已约定的最小字段”，而不是依赖某次 AI 临时生成的额外字段
 - 当某字段无法可靠生成时，可留空、缺省或显式标记不确定状态，但不应伪造高置信度内容
 
 ### `notes.json` 最小格式约定
@@ -423,7 +422,7 @@ AI 生成一个 Python 脚本，对标准化 HTML 进行进一步处理，得到
 ### 中间产物
 
 - `book.raw.html`
-- `raw_outline.json`
+- `raw_outline.xml`
 - `normalize.py`
 - `book.normalized.html`
 - `structure.json`
@@ -493,11 +492,54 @@ MVP 完成的标准：
 13. 正文中可识别出的章节应尽量落入 `section.chapter[data-type="chapter"]`；无法稳定识别的内容必须保留，不得静默丢弃
 14. `notes.json` 中每条 note 的新 id 必须唯一；正文中的注释引用在提取后仍可映射到对应 note
 15. `interview.md` 中实际提问数量应为 3-5 个；若少于 3 个，必须在记录中说明提前结束原因
-16. `summary.md` 应说明最终执行了哪些处理、哪些策略未执行、哪些内容因不确定性被保留
+16. `summary.md` 应说明最终执行了哪些处理、哪些策略未执行、哪些内容因不确定性被保留、
 
 ---
 
-## 8. 非目标
+## 8. 技术栈
+
+### 主程序
+
+- **语言**：Rust
+- **CLI 框架**：`clap`
+- **交互式问答**：`inquire`
+- **HTML 解析**（生成结构视图）：`scraper`
+- **HTTP 客户端 / AI SDK**：`async-openai`（支持自定义 `base_url`，兼容所有 OpenAI 兼容接口）
+- **JSON 序列化**：`serde` / `serde_json`
+- **环境变量加载**：`dotenvy`（启动时自动加载 `.env` 文件）
+
+### AI 接口
+
+使用 **OpenAI 兼容接口**（`/v1/chat/completions`），通过 `async-openai` SDK 调用，配置自定义 `base_url` 以支持任意兼容接口。
+
+各步骤的 AI 可独立配置，以支持为不同任务选用不同模型或接口（如结构提取用廉价快速模型，脚本生成用高能力模型）。
+
+配置方式（支持全局默认 + 按步骤覆盖）：
+
+| 环境变量 | 说明 |
+|---|---|
+| `AI_BASE_URL` | 默认接口地址 |
+| `AI_API_KEY` | 默认鉴权密钥 |
+| `AI_MODEL` | 默认模型名称 |
+| `AI_BASE_URL_STEP2` | Step 2 专用接口地址（覆盖默认） |
+| `AI_API_KEY_STEP2` | Step 2 专用密钥 |
+| `AI_MODEL_STEP2` | Step 2 专用模型 |
+| `AI_BASE_URL_STEP4` | Step 4 专用接口地址 |
+| `AI_MODEL_STEP4` | Step 4 专用模型 |
+| `AI_BASE_URL_STEP5` | Step 5 专用接口地址 |
+| `AI_MODEL_STEP5` | Step 5 专用模型 |
+
+未配置步骤专用变量时，回退到全局默认值。也可通过配置文件（如 `bookcli.toml`）统一管理，环境变量优先级高于配置文件。
+
+### AI 生成脚本
+
+- **语言**：Python 3
+- **执行方式**：主程序通过 `std::process::Command` 调用 `python3`
+- AI 生成 `normalize.py` 与 `transform.py`，主程序负责调用并捕获输出
+
+---
+
+## 9. 非目标
 
 以下内容不属于当前版本：
 
