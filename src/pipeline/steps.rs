@@ -2,12 +2,14 @@ use std::{collections::BTreeMap, fs, io::IsTerminal, process::Command};
 
 use anyhow::{Context, Result, bail};
 use kuchiki::{parse_html, traits::TendrilSink};
+use serde::Deserialize;
+use serde_json::json;
 
 use crate::{ai, cli::Step, config::resolve_ai_config};
 
 use super::{
     helpers::{
-        ask_select, ask_text, build_raw_outline, compact_text, ensure_exists, find_chapter_id,
+        ask_choice_with_custom, build_raw_outline, compact_text, ensure_exists, find_chapter_id,
         inner_html, parse_strategy_data, relative_display, render_interview_markdown,
         render_normalize_report, render_strategy_markdown, summarize_structure, write_summary,
     },
@@ -390,71 +392,36 @@ pub(super) async fn step4_interview(context: &mut RunContext) -> Result<String> 
 
     let interactive = std::io::stdin().is_terminal();
     let mut answers = Vec::new();
-
-    answers.push(InterviewAnswer {
-        question: format!(
-            "你这次阅读《{}》最主要的目标是什么？",
-            structure.document.title
-        ),
-        answer: ask_text(interactive, "最主要的阅读目标", "快速抓住主线与关键观点")?,
-    });
-
-    let note_policy_answer = ask_select(
-        interactive,
-        "你希望如何处理注释？",
-        vec![
-            "保留到文末集中查看",
-            "在引用处提供简短预览",
-            "尽量弱化，只在需要时查看",
-        ],
-        "在引用处提供简短预览",
-    )?;
-    answers.push(InterviewAnswer {
-        question: "你希望如何处理注释？".to_string(),
-        answer: note_policy_answer.clone(),
-    });
-
-    let third_question = if answers[0].answer.contains("快速")
-        || answers[0].answer.contains("概览")
-        || answers[0].answer.contains("主线")
-    {
-        "你希望额外增加什么增强内容？"
+    let mut interview_mode = if interactive {
+        "fallback-fixed".to_string()
     } else {
-        "你希望保留多细的标题层级？"
+        "auto-default".to_string()
     };
-    let third_default = if third_question.contains("增强内容") {
-        "每章增加简短导读与摘要"
-    } else {
-        "保留章节和关键小节标题"
-    };
-    answers.push(InterviewAnswer {
-        question: third_question.to_string(),
-        answer: ask_text(interactive, third_question, third_default)?,
-    });
 
-    answers.push(InterviewAnswer {
-        question: "你通常会在什么场景阅读这份 HTML？".to_string(),
-        answer: ask_select(
-            interactive,
-            "阅读场景",
-            vec!["桌面精读", "手机碎片阅读", "打印或导出前检查"],
-            "桌面精读",
-        )?,
-    });
-
-    if note_policy_answer.contains("预览") || note_policy_answer.contains("弱化") {
-        answers.push(InterviewAnswer {
-            question: "注释内容更适合保留原文，还是允许轻微改写成更易读的短注？".to_string(),
-            answer: ask_select(
-                interactive,
-                "注释改写程度",
-                vec!["尽量保留原文", "允许改写成更短的阅读提示"],
-                "尽量保留原文",
-            )?,
-        });
+    if interactive {
+        if let Some(ai_config) = resolve_ai_config(&context.config, Step::Step4)? {
+            interview_mode = "ai-dynamic".to_string();
+            let interview_result =
+                run_dynamic_interview(context, &structure, &ai_config, interactive).await;
+            match interview_result {
+                Ok(dynamic_answers) => {
+                    answers = dynamic_answers;
+                }
+                Err(error) => {
+                    context.log_lines.push(format!(
+                        "[warn] step4 AI interview failed, falling back to fixed questions: {error:#}"
+                    ));
+                    interview_mode = "ai-dynamic+fallback-fixed".to_string();
+                }
+            }
+        }
     }
 
-    let interview_md = render_interview_markdown(&structure, &answers, interactive);
+    if answers.len() < 3 {
+        answers = collect_fallback_interview_answers(&structure, interactive, answers)?;
+    }
+
+    let interview_md = render_interview_markdown(&structure, &answers, &interview_mode);
     fs::write(&context.artifacts.interview_md, interview_md).with_context(|| {
         format!(
             "failed to write {}",
@@ -534,6 +501,247 @@ Content guidance:
         "recorded {} interview answers and generated strategy",
         answers.len()
     ))
+}
+
+async fn run_dynamic_interview(
+    context: &mut RunContext,
+    structure: &StructureSummary,
+    ai_config: &crate::config::ResolvedAiConfig,
+    interactive: bool,
+) -> Result<Vec<InterviewAnswer>> {
+    let mut answers = Vec::new();
+
+    loop {
+        if answers.len() >= 5 {
+            break;
+        }
+
+        let decision = request_interview_decision(context, structure, ai_config, &answers).await?;
+        if let Some(reason) = &decision.reason {
+            context.log_lines.push(format!(
+                "[step4 interview decision {}]\n{}",
+                answers.len() + 1,
+                reason
+            ));
+        }
+        if decision.decision == "finish" {
+            if answers.len() >= 3 {
+                break;
+            }
+            context.log_lines.push(
+                "[warn] step4 AI attempted to finish before reaching 3 questions; continuing"
+                    .to_string(),
+            );
+        }
+
+        let question = decision
+            .question
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+            .context("step4 AI interview returned no question")?;
+        if answers.iter().any(|item| item.question == question) {
+            bail!("step4 AI repeated an existing interview question: {question}");
+        }
+        let options = sanitize_interview_options(&decision.options)?;
+        let default_answer = decision
+            .default_answer
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| {
+                options
+                    .first()
+                    .map(|item| item.as_str())
+                    .unwrap_or("保持当前默认推荐")
+            });
+        let answer = ask_choice_with_custom(interactive, question, &options, default_answer)?;
+        answers.push(InterviewAnswer {
+            question: question.to_string(),
+            answer: normalize_interview_answer(&answer, default_answer),
+        });
+    }
+
+    Ok(answers)
+}
+
+async fn request_interview_decision(
+    context: &mut RunContext,
+    structure: &StructureSummary,
+    ai_config: &crate::config::ResolvedAiConfig,
+    answers: &[InterviewAnswer],
+) -> Result<InterviewDecision> {
+    let system = r#"你是阅读处理策略访谈代理。你的任务是决定下一步是继续提问，还是结束访谈并进入策略生成。
+
+你必须严格输出一个 JSON 对象，不要输出 markdown，不要输出解释，不要使用代码块。
+
+JSON 格式：
+{
+  "decision": "ask" | "finish",
+  "question": "当 decision=ask 时必须提供的中文问题",
+  "options": ["当 decision=ask 时必须提供的 2-5 个简短候选项"],
+  "default_answer": "该问题的简短默认回答，供非交互模式降级使用，可为空",
+  "reason": "一句话说明为什么问这个问题或为什么现在可以结束"
+}
+
+规则：
+- 整个访谈总问题数必须在 3 到 5 之间。
+- 当前答案数少于 3 时，decision 只能是 "ask"。
+- 当前答案数达到 5 时，decision 只能是 "finish"。
+- 问题必须只服务于生成阅读处理策略，不得闲聊。
+- 当 decision=ask 时，options 必须提供 2 到 5 个可直接选择的候选项，且彼此尽量区分明确。
+- 不要把“其他”“自定义”之类的候选项放进 options；CLI 会自动额外提供“自定义输入”入口。
+- default_answer 最好直接取自 options 之一。
+- 优先补齐以下决策信息：处理目标、处理重点、注释策略、标题/章节策略、增强内容、阅读场景。
+- 不要重复已经问过的问题。
+- 如果已有信息足够支撑以上策略字段，且当前答案数已经至少 3 个，可以返回 "finish"。
+- 问题必须简洁、单一、可直接回答。"#;
+    let user = format!(
+        "{}",
+        json!({
+            "book_structure": structure,
+            "current_answer_count": answers.len(),
+            "required_topics": [
+                "processing_goal",
+                "processing_focus",
+                "note_policy",
+                "heading_policy",
+                "enhancements",
+                "reading_scenario"
+            ],
+            "answers": answers.iter().enumerate().map(|(index, answer)| {
+                json!({
+                    "index": index + 1,
+                    "question": answer.question,
+                    "answer": answer.answer
+                })
+            }).collect::<Vec<_>>()
+        })
+    );
+    let debug = ai::complete_with_debug(ai_config, system, &user).await;
+    let step_name = format!("step4-interview-{:02}", answers.len() + 1);
+    write_ai_trace_files(context, &step_name, system, &user, &debug)?;
+    log_ai_raw_response(context, &step_name, &debug);
+
+    let payload = debug
+        .extracted_content
+        .clone()
+        .context("step4 AI interview returned empty content")?;
+    let decision: InterviewDecision = serde_json::from_str(&payload)
+        .with_context(|| format!("failed to parse step4 interview JSON: {payload}"))?;
+
+    match decision.decision.as_str() {
+        "ask" | "finish" => Ok(decision),
+        other => bail!("unsupported step4 interview decision: {other}"),
+    }
+}
+
+fn collect_fallback_interview_answers(
+    structure: &StructureSummary,
+    interactive: bool,
+    existing_answers: Vec<InterviewAnswer>,
+) -> Result<Vec<InterviewAnswer>> {
+    let mut answers = existing_answers;
+    let presets = vec![
+        (
+            format!(
+                "你这次阅读《{}》最主要的目标是什么？",
+                structure.document.title
+            ),
+            vec![
+                "快速抓住主线与关键观点".to_string(),
+                "为课程或考试梳理框架".to_string(),
+                "做研究，保留更多论证细节".to_string(),
+            ],
+            "快速抓住主线与关键观点",
+        ),
+        (
+            "你更希望这份阅读版在内容组织上偏向精简主线，还是尽量保留原书层次与细节？".to_string(),
+            vec![
+                "优先精简主线，减少干扰".to_string(),
+                "主线优先，但保留关键层级".to_string(),
+                "尽量完整保留原书层次与细节".to_string(),
+            ],
+            "保留主线，同时尽量保留章节层次",
+        ),
+        (
+            "你希望注释如何处理？是文末集中查看、就地短预览，还是尽量弱化？".to_string(),
+            vec![
+                "保留到文末集中查看".to_string(),
+                "在引用处提供简短预览".to_string(),
+                "尽量弱化，只在需要时查看".to_string(),
+            ],
+            "在引用处提供简短预览，必要时可查看完整注释",
+        ),
+        (
+            "你希望额外增加哪些增强内容，比如每章摘要、导读或索引？".to_string(),
+            vec![
+                "每章增加简短导读与摘要".to_string(),
+                "增加目录导航或索引".to_string(),
+                "不额外增加增强内容".to_string(),
+            ],
+            "每章增加简短导读与摘要",
+        ),
+        (
+            "你通常会在什么场景阅读这份 HTML？".to_string(),
+            vec![
+                "桌面精读".to_string(),
+                "手机碎片阅读".to_string(),
+                "打印或导出前检查".to_string(),
+            ],
+            "桌面精读",
+        ),
+    ];
+
+    for (question, options, default_answer) in presets {
+        if answers.iter().any(|item| item.question == question) {
+            continue;
+        }
+        let answer = ask_choice_with_custom(interactive, &question, &options, default_answer)?;
+        answers.push(InterviewAnswer {
+            question,
+            answer: normalize_interview_answer(&answer, default_answer),
+        });
+        if answers.len() >= 3 {
+            break;
+        }
+    }
+
+    Ok(answers)
+}
+
+fn normalize_interview_answer(answer: &str, default_answer: &str) -> String {
+    let trimmed = answer.trim();
+    if trimmed.is_empty() {
+        default_answer.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn sanitize_interview_options(options: &[String]) -> Result<Vec<String>> {
+    let cleaned = options
+        .iter()
+        .map(|item| item.trim())
+        .filter(|item| !item.is_empty())
+        .map(ToOwned::to_owned)
+        .collect::<Vec<_>>();
+    if !(2..=5).contains(&cleaned.len()) {
+        bail!(
+            "step4 AI must provide 2-5 interview options, got {}",
+            cleaned.len()
+        );
+    }
+    Ok(cleaned)
+}
+
+#[derive(Debug, Deserialize)]
+struct InterviewDecision {
+    decision: String,
+    question: Option<String>,
+    #[serde(default)]
+    options: Vec<String>,
+    default_answer: Option<String>,
+    #[allow(dead_code)]
+    reason: Option<String>,
 }
 
 pub(super) async fn step5_generate_transform(context: &mut RunContext) -> Result<String> {
@@ -710,14 +918,16 @@ fn write_ai_trace_files(
 }
 
 fn log_ai_raw_response(context: &mut RunContext, step_name: &str, debug: &ai::AiCallRecord) {
-    context.log_lines.push(format!(
-        "[{step_name} ai endpoint]\n{}",
-        debug.endpoint
-    ));
-    context.log_lines.push(format!("[{step_name} ai model]\n{}", debug.model));
+    context
+        .log_lines
+        .push(format!("[{step_name} ai endpoint]\n{}", debug.endpoint));
+    context
+        .log_lines
+        .push(format!("[{step_name} ai model]\n{}", debug.model));
     context.log_lines.push(format!(
         "[{step_name} ai response status]\n{}",
-        debug.response_status
+        debug
+            .response_status
             .map(|status| status.to_string())
             .unwrap_or_else(|| "none".to_string())
     ));

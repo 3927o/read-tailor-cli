@@ -277,21 +277,14 @@ fn is_base64_data_uri(value: &str) -> bool {
 pub(crate) fn render_interview_markdown(
     structure: &StructureSummary,
     answers: &[InterviewAnswer],
-    interactive: bool,
+    mode: &str,
 ) -> String {
     let mut output = String::new();
     let _ = writeln!(output, "# Interview\n");
     let _ = writeln!(output, "- 书名：{}", structure.document.title);
     let _ = writeln!(output, "- 章节数：{}", structure.chapters.len());
-    let _ = writeln!(
-        output,
-        "- 模式：{}",
-        if interactive {
-            "interactive"
-        } else {
-            "auto-default"
-        }
-    );
+    let _ = writeln!(output, "- 模式：{}", mode);
+    let _ = writeln!(output, "- 问题数：{}", answers.len());
     output.push('\n');
     for (index, answer) in answers.iter().enumerate() {
         let _ = writeln!(output, "## Q{}\n", index + 1);
@@ -302,47 +295,79 @@ pub(crate) fn render_interview_markdown(
 }
 
 pub(crate) fn render_strategy_markdown(title: &str, answers: &[InterviewAnswer]) -> String {
-    let note_policy = if answers.iter().any(|item| item.answer.contains("集中查看")) {
+    let goal = find_answer_by_keywords(
+        answers,
+        &["目标", "目的", "想获得", "主要想看", "为什么"],
+        &["主线", "关键观点", "理解", "梳理", "精读", "综述"],
+    )
+    .unwrap_or_else(|| "提升阅读流畅度并更快抓住核心内容".to_string());
+    let focus = find_answer_by_keywords(
+        answers,
+        &[
+            "处理重点",
+            "内容组织",
+            "保留",
+            "层级",
+            "标题",
+            "章节",
+            "结构",
+        ],
+        &["层次", "结构", "重点", "主线", "细节", "摘要", "导读"],
+    )
+    .unwrap_or_else(|| "保留核心结构并减少干扰信息".to_string());
+    let note_policy = if answers.iter().any(|item| {
+        contains_any(&item.question, &["注释", "脚注", "尾注"])
+            || contains_any(&item.answer, &["文末", "集中查看", "集中", "统一查看"])
+    }) && answers
+        .iter()
+        .any(|item| contains_any(&item.answer, &["文末", "集中查看", "集中"]))
+    {
         "endnotes"
-    } else if answers.iter().any(|item| item.answer.contains("预览")) {
+    } else if answers
+        .iter()
+        .any(|item| contains_any(&item.answer, &["预览", "提示", "就地", "悬浮"]))
+    {
         "preview"
     } else {
         "minimal"
     };
-    let heading_policy = if answers
-        .iter()
-        .any(|item| item.answer.contains("保留") && item.answer.contains("标题"))
-    {
+    let heading_policy = if answers.iter().any(|item| {
+        contains_any(&item.question, &["标题", "章节", "层级", "小节"])
+            || contains_any(
+                &item.answer,
+                &["保留章节", "保留小节", "保留层级", "细标题", "层次"],
+            )
+    }) {
         "preserve-sections"
     } else {
         "chapter-first"
     };
-    let enhancements = if answers
+    let mut enhancements = Vec::new();
+    if answers
         .iter()
-        .any(|item| item.answer.contains("摘要") || item.answer.contains("导读"))
+        .any(|item| contains_any(&item.answer, &["摘要", "导读", "提要"]))
     {
-        vec!["chapter-guides".to_string()]
-    } else {
-        Vec::new()
-    };
+        enhancements.push("chapter-guides".to_string());
+    }
+    if answers
+        .iter()
+        .any(|item| contains_any(&item.answer, &["索引", "检索", "目录导航"]))
+    {
+        enhancements.push("index".to_string());
+    }
     let strategy = StrategyData {
         title: title.to_string(),
-        processing_goal: answers
-            .first()
-            .map(|item| item.answer.clone())
-            .unwrap_or_else(|| "提升阅读流畅度".to_string()),
-        processing_focus: answers
-            .get(2)
-            .map(|item| item.answer.clone())
-            .unwrap_or_else(|| "保留核心结构并减少干扰".to_string()),
+        processing_goal: goal,
+        processing_focus: focus,
         note_policy: note_policy.to_string(),
         heading_policy: heading_policy.to_string(),
         enhancements: enhancements.clone(),
-        reading_scenario: answers
-            .iter()
-            .find(|item| item.question.contains("阅读场景"))
-            .map(|item| item.answer.clone())
-            .unwrap_or_else(|| "桌面精读".to_string()),
+        reading_scenario: find_answer_by_keywords(
+            answers,
+            &["阅读场景", "什么场景", "设备", "终端"],
+            &["手机", "桌面", "打印", "导出", "碎片阅读"],
+        )
+        .unwrap_or_else(|| "桌面精读".to_string()),
     };
 
     format!(
@@ -363,8 +388,11 @@ pub(crate) fn render_strategy_markdown(title: &str, answers: &[InterviewAnswer])
 
 pub(crate) fn ask_text(interactive: bool, prompt: &str, default: &str) -> Result<String> {
     if interactive {
-        let value = Text::new(prompt)
-            .with_default(default)
+        let mut text = Text::new(prompt);
+        if !default.trim().is_empty() {
+            text = text.with_default(default);
+        }
+        let value = text
             .prompt()
             .with_context(|| format!("failed to ask: {prompt}"))?;
         Ok(value)
@@ -373,20 +401,39 @@ pub(crate) fn ask_text(interactive: bool, prompt: &str, default: &str) -> Result
     }
 }
 
-pub(crate) fn ask_select(
+pub(crate) fn ask_choice_with_custom(
     interactive: bool,
     prompt: &str,
-    options: Vec<&str>,
+    options: &[String],
     default: &str,
 ) -> Result<String> {
-    if interactive {
-        let value = Select::new(prompt, options.clone())
-            .prompt()
-            .with_context(|| format!("failed to ask: {prompt}"))?;
-        Ok(value.to_string())
-    } else {
-        Ok(default.to_string())
+    if !interactive {
+        return Ok(default
+            .trim()
+            .to_string()
+            .if_empty_then(|| options.first().cloned().unwrap_or_default()));
     }
+
+    let custom_label = "自定义输入...".to_string();
+    let mut choices = options
+        .iter()
+        .filter(|item| !item.trim().is_empty())
+        .cloned()
+        .collect::<Vec<_>>();
+    if choices.is_empty() {
+        choices.push(default.to_string());
+    }
+    if !choices.iter().any(|item| item == &custom_label) {
+        choices.push(custom_label.clone());
+    }
+
+    let selected = Select::new(prompt, choices)
+        .prompt()
+        .with_context(|| format!("failed to ask: {prompt}"))?;
+    if selected == custom_label {
+        return ask_text(true, "请输入你的自定义回答", default);
+    }
+    Ok(selected)
 }
 
 pub(crate) fn parse_strategy_data(markdown: &str) -> Result<StrategyData> {
@@ -440,8 +487,7 @@ pub(crate) fn slugify(value: &str) -> String {
     let mut slug = String::new();
     let mut last_dash = false;
     for ch in value.chars() {
-        let safe = ch.is_alphanumeric()
-            || matches!(ch, '_' | '-' | '.');
+        let safe = ch.is_alphanumeric() || matches!(ch, '_' | '-' | '.');
         if safe {
             for lower in ch.to_lowercase() {
                 slug.push(lower);
@@ -466,6 +512,39 @@ pub(crate) fn ensure_exists(path: &Path) -> Result<()> {
         bail!("required artifact is missing: {}", path.display());
     }
     Ok(())
+}
+
+fn find_answer_by_keywords(
+    answers: &[InterviewAnswer],
+    question_keywords: &[&str],
+    answer_keywords: &[&str],
+) -> Option<String> {
+    answers
+        .iter()
+        .find(|item| {
+            contains_any(&item.question, question_keywords)
+                || contains_any(&item.answer, answer_keywords)
+        })
+        .map(|item| item.answer.clone())
+}
+
+fn contains_any(value: &str, keywords: &[&str]) -> bool {
+    keywords.iter().any(|keyword| value.contains(keyword))
+}
+
+trait IfEmptyThen {
+    fn if_empty_then<F>(self, fallback: F) -> Self
+    where
+        F: FnOnce() -> Self;
+}
+
+impl IfEmptyThen for String {
+    fn if_empty_then<F>(self, fallback: F) -> Self
+    where
+        F: FnOnce() -> Self,
+    {
+        if self.is_empty() { fallback() } else { self }
+    }
 }
 
 pub(crate) fn select_steps(args: &RunArgs) -> Vec<Step> {
