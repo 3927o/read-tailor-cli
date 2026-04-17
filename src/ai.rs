@@ -1,3 +1,4 @@
+use futures_util::StreamExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
@@ -8,6 +9,7 @@ struct ChatRequest<'a> {
     model: &'a str,
     temperature: f32,
     messages: Vec<ChatMessage<'a>>,
+    stream: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -17,32 +19,23 @@ struct ChatMessage<'a> {
 }
 
 #[derive(Debug, Deserialize)]
-struct ChatResponse {
-    choices: Vec<Choice>,
+struct StreamChunk {
+    #[serde(default)]
+    choices: Vec<StreamChoice>,
 }
 
 #[derive(Debug, Deserialize)]
-struct Choice {
-    message: ChoiceMessage,
+struct StreamChoice {
+    #[serde(default)]
+    delta: StreamDelta,
+    #[serde(default)]
+    finish_reason: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-struct ChoiceMessage {
-    content: Content,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum Content {
-    Text(String),
-    Parts(Vec<ContentPart>),
-}
-
-#[derive(Debug, Deserialize)]
-struct ContentPart {
-    #[serde(rename = "type")]
-    kind: Option<String>,
-    text: Option<String>,
+#[derive(Debug, Deserialize, Default)]
+struct StreamDelta {
+    #[serde(default)]
+    content: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -75,6 +68,7 @@ pub async fn complete_with_debug(
                 content: user,
             },
         ],
+        stream: true,
     };
     let endpoint = config.endpoint();
     let request_body = serde_json::to_string_pretty(&request)
@@ -83,6 +77,7 @@ pub async fn complete_with_debug(
     let response = client
         .post(&endpoint)
         .bearer_auth(&config.api_key)
+        .header("Accept", "text/event-stream")
         .json(&request)
         .send()
         .await;
@@ -103,67 +98,115 @@ pub async fn complete_with_debug(
     };
 
     let status = response.status();
-    let response_body = response.text().await.unwrap_or_default();
 
     if !status.is_success() {
+        let error_body = response.text().await.unwrap_or_default();
         return AiCallRecord {
             endpoint,
             model: config.model.clone(),
             request_body,
             response_status: Some(status.as_u16()),
-            response_body: Some(response_body.clone()),
+            response_body: Some(error_body.clone()),
             extracted_content: None,
-            error: Some(format!("AI request failed with {status}: {response_body}")),
+            error: Some(format!("AI request failed with {status}: {error_body}")),
         };
     }
 
-    let response: ChatResponse = match serde_json::from_str(&response_body) {
-        Ok(response) => response,
-        Err(error) => {
-            return AiCallRecord {
-                endpoint,
-                model: config.model.clone(),
-                request_body,
-                response_status: Some(status.as_u16()),
-                response_body: Some(response_body),
-                extracted_content: None,
-                error: Some(format!("failed to deserialize AI response: {error}")),
+    let mut stream = response.bytes_stream();
+    let mut raw_buffer = String::new();
+    let mut line_buffer = String::new();
+    let mut content_parts: Vec<String> = Vec::new();
+    let mut stream_error: Option<String> = None;
+    let mut finish_reason: Option<String> = None;
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = match chunk {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                stream_error = Some(format!("stream read error: {error}"));
+                break;
+            }
+        };
+        let text = match std::str::from_utf8(&chunk) {
+            Ok(text) => text,
+            Err(error) => {
+                stream_error = Some(format!("utf-8 decode error in stream chunk: {error}"));
+                break;
+            }
+        };
+        raw_buffer.push_str(text);
+        line_buffer.push_str(text);
+
+        while let Some(idx) = line_buffer.find('\n') {
+            let mut line: String = line_buffer.drain(..=idx).collect();
+            // Strip trailing \n and an optional preceding \r.
+            if line.ends_with('\n') {
+                line.pop();
+            }
+            if line.ends_with('\r') {
+                line.pop();
+            }
+            let line = line.trim();
+            if line.is_empty() || line.starts_with(':') {
+                continue;
+            }
+            let payload = match line.strip_prefix("data:") {
+                Some(rest) => rest.trim(),
+                None => continue,
             };
-        }
-    };
-
-    let choice = match response.choices.into_iter().next() {
-        Some(choice) => choice,
-        None => {
-            return AiCallRecord {
-                endpoint,
-                model: config.model.clone(),
-                request_body,
-                response_status: Some(status.as_u16()),
-                response_body: Some(response_body),
-                extracted_content: None,
-                error: Some("AI response did not contain any choices".to_string()),
+            if payload == "[DONE]" {
+                finish_reason.get_or_insert_with(|| "done".to_string());
+                continue;
+            }
+            let parsed: StreamChunk = match serde_json::from_str(payload) {
+                Ok(chunk) => chunk,
+                Err(_) => continue,
             };
+            for choice in parsed.choices {
+                if let Some(text) = choice.delta.content {
+                    if !text.is_empty() {
+                        content_parts.push(text);
+                    }
+                }
+                if let Some(reason) = choice.finish_reason {
+                    finish_reason = Some(reason);
+                }
+            }
         }
-    };
+    }
 
-    let content = match choice.message.content {
-        Content::Text(text) => text,
-        Content::Parts(parts) => parts
-            .into_iter()
-            .filter(|part| part.kind.as_deref() == Some("text"))
-            .filter_map(|part| part.text)
-            .collect::<Vec<_>>()
-            .join(""),
-    };
+    if let Some(error) = stream_error {
+        return AiCallRecord {
+            endpoint,
+            model: config.model.clone(),
+            request_body,
+            response_status: Some(status.as_u16()),
+            response_body: Some(raw_buffer),
+            extracted_content: None,
+            error: Some(error),
+        };
+    }
 
+    if finish_reason.is_none() {
+        return AiCallRecord {
+            endpoint,
+            model: config.model.clone(),
+            request_body,
+            response_status: Some(status.as_u16()),
+            response_body: Some(raw_buffer),
+            extracted_content: None,
+            error: Some("AI stream ended without a finish signal".to_string()),
+        };
+    }
+
+    let content: String = content_parts.concat();
     if content.trim().is_empty() {
         return AiCallRecord {
             endpoint,
             model: config.model.clone(),
             request_body,
             response_status: Some(status.as_u16()),
-            response_body: Some(response_body),
+            response_body: Some(raw_buffer),
             extracted_content: None,
             error: Some("AI response content was empty".to_string()),
         };
@@ -174,7 +217,7 @@ pub async fn complete_with_debug(
         model: config.model.clone(),
         request_body,
         response_status: Some(status.as_u16()),
-        response_body: Some(response_body),
+        response_body: Some(raw_buffer),
         extracted_content: Some(strip_code_fences(&content)),
         error: None,
     }

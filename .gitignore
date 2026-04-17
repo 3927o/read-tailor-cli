@@ -3,3 +3,7 @@
 .DS_Store
 *.epub
 .env
+bookcli.toml
+
+!.env.example
+!bookcli.toml.example

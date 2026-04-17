@@ -39,10 +39,23 @@ AI 是可选的。未配置 AI 时，Step 2 和 Step 5 会回退到内置 Python
 运行前请确保本机有：
 
 - Rust / Cargo
-- `python3`
+- `python`
 - `pandoc`
 
-本项目启动时会自动加载 `.env`。
+本项目启动时会自动加载当前目录下的 `.env`。
+
+首次使用时，可以基于仓库里的示例文件生成自己的配置：
+
+```bash
+cp .env.example .env
+cp bookcli.toml.example bookcli.toml
+```
+
+两者都是可选的：
+
+- 只用 `.env` 就足以驱动全部 AI 能力
+- `bookcli.toml` 适合把配置提交到团队的私有仓库或做分步骤覆盖
+- 两者都不配置时，Step 2 / Step 5 会回退到内置 Python 模板，仍可跑通
 
 ## 快速开始
 

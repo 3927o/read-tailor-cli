@@ -39,7 +39,7 @@ pub(crate) struct StructureSummary {
     pub(crate) document: DocumentMeta,
     pub(crate) landmarks: Landmarks,
     pub(crate) chapters: Vec<ChapterSummary>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) unknown_blocks: Vec<UnknownBlock>,
     pub(crate) stats: Stats,
 }

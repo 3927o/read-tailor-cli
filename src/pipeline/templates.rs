@@ -1,5 +1,5 @@
 pub(crate) fn fallback_normalize_script() -> String {
-    r###"#!/usr/bin/env python3
+    r###"#!/usr/bin/env python
 import argparse
 import html
 import json
@@ -140,7 +140,7 @@ if __name__ == "__main__":
 }
 
 pub(crate) fn fallback_transform_script() -> String {
-    r###"#!/usr/bin/env python3
+    r###"#!/usr/bin/env python
 import argparse
 import json
 import re

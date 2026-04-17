@@ -70,9 +70,54 @@ pub(super) async fn step2_normalize(context: &mut RunContext) -> Result<String> 
     let mut ai_status = "fallback";
     let mut normalize_script = fallback_normalize_script();
     if let Some(ai_config) = resolve_ai_config(&context.config, Step::Step2)? {
-        let system = "You generate a standalone Python 3 script for HTML normalization. Return only Python code with no markdown fences.";
+        let system = r#"You are a senior HTML-normalization engineer. Your job is to emit a single, standalone Python 3 script that normalizes raw book HTML into a standard book HTML.
+
+Output requirements:
+- Return ONLY the Python source code.
+- Do NOT wrap it in markdown fences, do NOT add commentary, do NOT add any preamble or epilogue text.
+
+Script contract:
+- Usage: python normalize.py INPUT OUTPUT
+- INPUT is a single-file raw HTML produced by pandoc from an EPUB.
+- OUTPUT is the normalized standard HTML to be written.
+
+Runtime environment (MUST follow):
+- Parse and build HTML using beautifulsoup4 only: `from bs4 import BeautifulSoup, NavigableString, Tag`.
+- Use the built-in `html.parser` backend: `BeautifulSoup(text, "html.parser")`. Do NOT require `lxml` or `html5lib`.
+- Do NOT use `xml.etree.ElementTree`, `xml.dom`, `lxml`, `html5lib`, or regex-based HTML rewriting for structural work. Raw HTML from pandoc is not well-formed XML and XML parsers will fail on it.
+- Only stdlib + `bs4` may be imported. No other third-party packages.
+- On malformed input, emit an error to stderr and exit with code 1 rather than silently producing empty output.
+
+Document skeleton the script must produce:
+- main#book[data-type="book"]
+- section#bodymatter[data-role="bodymatter"]
+- chapters as section.chapter[data-type="chapter"][id]
+- chapter title must be the first h1 inside each chapter
+- sub-sections as section[data-type="section"] with heading levels h2..h4
+- body paragraphs unified as p
+- table of contents as nav#toc[data-role="toc"]
+- preserve uncertain content as div[data-role="unknown"] (never silently drop)
+
+Note normalization (Step 3 performs pure extraction and depends on this):
+- collect every note body (footnote / endnote / chapter-end note) into a single section[data-role="notes"]
+- each note body must be [data-role="note"][id]
+- when the note kind is identifiable, record it via data-note-kind attribute (e.g. footnote / endnote / chapter-note)
+- all in-text note references must be normalized to a[data-role="noteref"][href][id], where href targets the note body id
+- if a note is referenced multiple times, keep exactly ONE note body and let multiple noterefs point to the same id (do NOT duplicate note bodies)
+- both the in-text noteref and any back-reference inside the note body must use explicit href/id pairs so references can be mapped unambiguously
+- preserve the original HTML fragment inside each note body verbatim (nested notes, cross-refs, block structures must NOT be flattened)
+- if a note cannot be reliably classified or relocated into section[data-role="notes"], downgrade to div[data-role="unknown"] instead of dropping it
+
+General rules:
+- keep content lossless; never silently delete body text
+- prefer semantic accuracy over aggressive rewriting"#;
         let user = format!(
-            "Normalize raw HTML into a standard book HTML.\nRequirements:\n- output main#book[data-type=\"book\"]\n- output section#bodymatter[data-role=\"bodymatter\"]\n- chapters as section.chapter[data-type=\"chapter\"][id]\n- chapter title should be the first h1 in each chapter\n- preserve uncertain content as div[data-role=\"unknown\"]\n- standardize note refs to a[data-role=\"noteref\"]\n- standardize notes container to section[data-role=\"notes\"] with child [data-role=\"note\"]\n- keep content lossless\n- script usage: python3 normalize.py INPUT OUTPUT\n\nUse the following structural outline only:\n{}",
+            r#"Generate normalize.py for a book whose structural outline is shown below. Base your logic on this outline only; do not try to fetch or invent additional context.
+
+<structural_outline>
+{}
+</structural_outline>
+"#,
             fs::read_to_string(&context.artifacts.raw_outline)?
         );
 
@@ -107,7 +152,7 @@ pub(super) async fn step2_normalize(context: &mut RunContext) -> Result<String> 
         )
     })?;
 
-    let run = Command::new("python3")
+    let run = Command::new("python")
         .arg(&context.artifacts.normalize_py)
         .arg(&context.artifacts.raw_html)
         .arg(&context.artifacts.normalized_html)
@@ -129,7 +174,7 @@ pub(super) async fn step2_normalize(context: &mut RunContext) -> Result<String> 
                 "[warn] AI-generated normalize.py failed; switching to fallback template".into(),
             );
             fs::write(&context.artifacts.normalize_py, fallback_normalize_script())?;
-            let rerun = Command::new("python3")
+            let rerun = Command::new("python")
                 .arg(&context.artifacts.normalize_py)
                 .arg(&context.artifacts.raw_html)
                 .arg(&context.artifacts.normalized_html)
@@ -260,7 +305,8 @@ pub(super) fn step3_extract_notes(context: &mut RunContext) -> Result<String> {
         attrs.insert("id", new_id.clone());
         attrs.insert("data-original-id", original_note_id.clone());
         let kind = attrs
-            .get("data-kind")
+            .get("data-note-kind")
+            .or_else(|| attrs.get("data-kind"))
             .or_else(|| attrs.get("class"))
             .map(ToOwned::to_owned)
             .unwrap_or_else(|| "unknown".to_string());
@@ -418,9 +464,36 @@ pub(super) async fn step4_interview(context: &mut RunContext) -> Result<String> 
 
     let fallback_strategy = render_strategy_markdown(&structure.document.title, &answers);
     let strategy = if let Some(ai_config) = resolve_ai_config(&context.config, Step::Step4)? {
-        let system = "You produce a concise reading strategy in Chinese markdown. Include a final JSON code block describing the strategy fields.";
+        let system = r#"You are a reading-experience strategist. Given a book's structural summary and a short user interview, produce a concise reading strategy in Simplified Chinese markdown.
+
+Output contract:
+- The entire response must be in Simplified Chinese markdown.
+- The strategy description must be human-readable, concise, and focused on decisions that drive the downstream processing script.
+- At the very end of the response, append ONE fenced JSON code block (```json ... ```) containing the machine-readable strategy with these required keys:
+  - title
+  - processing_goal
+  - processing_focus
+  - note_policy
+  - heading_policy
+  - enhancements
+  - reading_scenario
+- Do NOT add any content after that JSON block.
+- Do NOT wrap the entire response in a single outer code fence.
+
+Content guidance:
+- The strategy must clearly state: processing goal, processing focus, how notes are handled, how titles / chapters are handled, what enhancement content (summaries, reading guides, indices) is added, and what reading scenarios the output targets.
+- Do NOT invent facts that are not implied by the structural summary or the interview."#;
         let user = format!(
-            "Book structure:\n{}\n\nInterview:\n{}\n\nReturn a strategy.md in Chinese. Required JSON keys: title, processing_goal, processing_focus, note_policy, heading_policy, enhancements, reading_scenario.",
+            r#"Use the following inputs to produce strategy.md.
+
+<book_structure>
+{}
+</book_structure>
+
+<interview>
+{}
+</interview>
+"#,
             fs::read_to_string(&context.artifacts.structure_json)?,
             fs::read_to_string(&context.artifacts.interview_md)?,
         );
@@ -473,9 +546,44 @@ pub(super) async fn step5_generate_transform(context: &mut RunContext) -> Result
     let mut ai_status = "fallback";
     let mut script = fallback_transform_script();
     if let Some(ai_config) = resolve_ai_config(&context.config, Step::Step5)? {
-        let system = "You generate a standalone Python 3 transform script. Return only Python code with no markdown fences.";
+        let system = r#"You are a senior Python engineer. Your job is to emit a single, standalone Python 3 script that applies a reading strategy to a normalized book HTML.
+
+Output requirements:
+- Return ONLY the Python source code.
+- Do NOT wrap it in markdown fences, do NOT add commentary, do NOT add any preamble or epilogue text.
+
+Script contract:
+- Usage: python transform.py NORMALIZED_HTML NOTES_JSON STRATEGY_MD OUTPUT_HTML
+- Inputs:
+  - NORMALIZED_HTML: standard book HTML whose note bodies have already been stripped; in-text note references remain as a[data-role="noteref"][href][id].
+  - NOTES_JSON: structured notes file (schema: version, id_scheme, notes[{id, kind, chapter_id, order, source, refs, content, position}]).
+  - STRATEGY_MD: reading strategy in Simplified Chinese markdown; the final fenced JSON block holds machine-readable fields (title, processing_goal, processing_focus, note_policy, heading_policy, enhancements, reading_scenario).
+- Output:
+  - OUTPUT_HTML: the final reading-optimized HTML.
+- The script MUST also print a compact single-line JSON summary to stdout describing what was applied, what was skipped, and any uncertain content that was preserved.
+
+Behavior the script must implement:
+- Parse the strategy JSON block and apply its decisions.
+- Preserve content losslessly; never silently delete body text.
+- Optionally re-inject notes (inline preview, grouped endnotes, collapsed, etc.) according to note_policy.
+- Respect heading_policy for heading / chapter structure.
+- Add a reading guide and other enhancements according to enhancements.
+- Keep div[data-role="unknown"] blocks intact."#;
         let user = format!(
-            "Generate transform.py.\nScript usage: python3 transform.py NORMALIZED_HTML NOTES_JSON STRATEGY_MD OUTPUT_HTML\nThe script should apply the reading strategy, add a reading guide, preserve content, optionally re-inject notes, and print a compact JSON summary.\n\nstructure.json:\n{}\n\nnormalize_report.md:\n{}\n\nstrategy.md:\n{}",
+            r#"Generate transform.py for the following book.
+
+<structure_json>
+{}
+</structure_json>
+
+<normalize_report>
+{}
+</normalize_report>
+
+<strategy_md>
+{}
+</strategy_md>
+"#,
             fs::read_to_string(&context.artifacts.structure_json)?,
             fs::read_to_string(&context.artifacts.normalize_report)?,
             fs::read_to_string(&context.artifacts.strategy_md)?
@@ -515,7 +623,7 @@ pub(super) fn step6_run_transform(context: &mut RunContext) -> Result<String> {
     let ai_used = fs::read_to_string(&context.artifacts.transform_py)
         .unwrap_or_default()
         .contains("generated by AI");
-    let run = Command::new("python3")
+    let run = Command::new("python")
         .arg(&context.artifacts.transform_py)
         .arg(&context.artifacts.normalized_html)
         .arg(&context.artifacts.notes_json)
@@ -540,7 +648,7 @@ pub(super) fn step6_run_transform(context: &mut RunContext) -> Result<String> {
                 "[warn] AI-generated transform.py failed; switching to fallback template".into(),
             );
             fs::write(&context.artifacts.transform_py, fallback_transform_script())?;
-            let rerun = Command::new("python3")
+            let rerun = Command::new("python")
                 .arg(&context.artifacts.transform_py)
                 .arg(&context.artifacts.normalized_html)
                 .arg(&context.artifacts.notes_json)

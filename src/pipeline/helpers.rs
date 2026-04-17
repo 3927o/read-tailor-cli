@@ -440,8 +440,12 @@ pub(crate) fn slugify(value: &str) -> String {
     let mut slug = String::new();
     let mut last_dash = false;
     for ch in value.chars() {
-        if ch.is_ascii_alphanumeric() {
-            slug.push(ch.to_ascii_lowercase());
+        let safe = ch.is_alphanumeric()
+            || matches!(ch, '_' | '-' | '.');
+        if safe {
+            for lower in ch.to_lowercase() {
+                slug.push(lower);
+            }
             last_dash = false;
         } else if !last_dash {
             slug.push('-');
