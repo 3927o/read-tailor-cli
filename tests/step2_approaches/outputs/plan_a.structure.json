@@ -1,0 +1,32 @@
+{
+  "book": {
+    "id": "book",
+    "type": "book",
+    "sections": [
+      {
+        "id": "frontmatter",
+        "role": "frontmatter",
+        "type": null,
+        "content": []
+      },
+      {
+        "id": "bodymatter",
+        "role": "bodymatter",
+        "type": null,
+        "content": []
+      },
+      {
+        "id": "backmatter",
+        "role": "backmatter",
+        "type": null,
+        "content": []
+      },
+      {
+        "id": "notes",
+        "role": "notes",
+        "type": null,
+        "content": []
+      }
+    ]
+  }
+}

@@ -9,8 +9,8 @@
 1. 把 EPUB 转成 HTML
 2. 把源 HTML 规范化为统一的标准 HTML
 3. 通过 AI 动态提问了解用户需求
-4. 让 AI 生成针对这本书的处理脚本
-5. 执行脚本并输出优化后的结果
+4. 让 AI 对内容做增强加工（生成导读、概念卡片等）
+5. 注入阅读器 UI 并输出最终结果
 
 ---
 
@@ -23,10 +23,10 @@ MVP 只支持：
 - 输出：优化后的 `.html`
 - 交互方式：CLI
 - AI 用途：
-  - 规范化方案/脚本生成
+  - 结构识别与映射方案生成
   - 动态问答
   - 阅读策略生成
-  - 最终处理脚本生成
+  - 内容增强加工（章节导读、概念卡片、注释改写等）
 
 MVP 暂不支持：
 
@@ -184,45 +184,70 @@ CLI 与用户进行 **3-5 个问题** 的对话。
 
 ---
 
-### Step 5：AI 生成 Python 处理脚本
+### Step 5：AI 内容增强加工
 
-基于以下上下文：
+这一步是 transform.py 的职责——**对标准化 HTML 的内容进行智能增强**，不是处理 UI/结构/DOM 格式。
 
-- `structure.json`
-- `strategy.md`
-- 本 PRD 中定义的“标准 HTML 最小要求”
-- `normalize_report.md`
+transform.py 是整个流程中唯一一个可以调用 AI 模型的加工步骤。它基于以下上下文工作：
 
-AI 生成一个 Python 脚本，对标准化 HTML 进行进一步处理，得到最终阅读版本。
+- `book.normalized.html`（已剥离注释正文的标准化 HTML）
+- `notes.json`（结构化注释数据）
+- `structure.json`（书籍结构摘要）
+- `strategy.md`（阅读处理策略）
 
 输出：
 
-- `transform.py`
+- `book.transformed.html`：内容增强后的 HTML
+- `transform.log`：加工日志
 
-脚本职责：
+#### transform.py 的职责
 
-- 读取 `book.normalized.html`
-- 按策略处理 DOM
-- 生成最终 HTML
-- 输出处理摘要
+**内容增强（核心）：**
+
+- 根据 strategy 中的指示，对章节生成导读/摘要（可调 AI）
+- 为核心概念生成概念卡片（可调 AI）
+- 对注释内容进行改写、简化、合并（可调 AI）
+- 生成跨章节的索引、关系图谱等增强内容
+
+**内容整理（辅助）：**
+
+- 按 strategy 指示重新组织注释（如折叠、合并、排序）
+- 按 strategy 指示调整章节呈现方式（如拆分长章、合并短章）
+- 剥离不需要的内容（如扉页图片、版权页等，若 strategy 指示）
+
+#### transform.py 不负责
+
+- 不负责注入阅读器 UI（目录、进度条、主题切换等）—— 这是 Step 6 的事
+- 不负责 HTML 结构规范化 —— 这是 Step 2 的事
+- 不负责注释提取 —— 这是 Step 3 的事
+
+#### 调用 AI 的约束
+
+- transform.py 中的 AI 调用应以**章节为粒度**，每次调用传入有限上下文（章节标题 + 前 N 字正文 + 相关注释），避免整本书塞入 prompt
+- AI 生成的内容应插入到明确标记的容器中（如 `<div class="chapter-guide">`），与原书正文有清晰区分
+- AI 调用失败时应跳过该章节的增强，保留原始内容，不应阻断整个流程
 
 ---
 
-### Step 6：执行脚本
+### Step 6：注入阅读器 UI 并输出最终结果
 
-执行 `transform.py`，输出最终结果。
+执行一个**固定的内置脚本**（如 `inject_ui.py`），将阅读器界面元素注入到 `book.transformed.html` 中，生成最终可阅读的 HTML。
+
+这一步**不调用 AI**，所有逻辑都是固定的。
+
+注入内容：
+
+- 侧边栏目录（TOC）
+- 阅读进度条
+- 主题切换（明/暗模式）
+- 响应式布局适配
+- 基础排版样式
 
 输出：
 
-- `book.final.html`
-- `run.log`
-- `summary.md`
-
-要求：
-
-- 支持只生成脚本不执行
-- 支持执行时保留中间产物
-- 执行失败时明确指出失败步骤和错误信息
+- `book.final.html`：自包含的最终阅读版本
+- `run.log`：执行日志
+- `summary.md`：全流程处理摘要
 
 ---
 
@@ -428,14 +453,15 @@ AI 生成一个 Python 脚本，对标准化 HTML 进行进一步处理，得到
 
 - `book.raw.html`
 - `raw_outline.xml`
-- `normalize.py`
+- `normalize.py`（AI 生成的规范化脚本）
 - `book.normalized.html`
 - `structure.json`
 - `notes.json`
 - `normalize_report.md`
 - `interview.md`
 - `strategy.md`
-- `transform.py`
+- `book.transformed.html`（内容增强后的 HTML）
+- `transform.log`
 
 ### 最终输出
 
@@ -487,8 +513,8 @@ MVP 完成的标准：
 6. 能提取注释并生成 `notes.json`
 7. 能从 `book.normalized.html` 中移除注释正文，同时保留注释引用
 8. AI 能在 3-5 个动态问题内完成访谈并生成明确的阅读处理策略
-9. 能生成可执行的 Python 脚本
-10. 能输出最终优化后的 HTML
+9. transform.py 能对章节生成有效的导读/摘要内容
+10. 能通过固定 UI 脚本输出最终可阅读的 HTML
 11. 全流程中间产物完整保存，失败时可定位具体步骤
 
 建议增加最低质量验收：
@@ -497,7 +523,9 @@ MVP 完成的标准：
 13. 正文中可识别出的章节应尽量落入 `section.chapter[data-type="chapter"]`；无法稳定识别的内容必须保留，不得静默丢弃
 14. `notes.json` 中每条 note 的新 id 必须唯一；正文中的注释引用在提取后仍可映射到对应 note
 15. `interview.md` 中实际提问数量应为 3-5 个；若少于 3 个，必须在记录中说明提前结束原因
-16. `summary.md` 应说明最终执行了哪些处理、哪些策略未执行、哪些内容因不确定性被保留、
+16. `summary.md` 应说明最终执行了哪些处理、哪些策略未执行、哪些内容因不确定性被保留
+17. `book.transformed.html` 中 AI 生成的内容（如导读）应有明确标记，与原书正文可区分
+18. `book.final.html` 中应包含目录导航、阅读进度条、主题切换等基础 UI 元素
 
 ---
 
@@ -540,7 +568,8 @@ MVP 完成的标准：
 
 - **语言**：Python 3
 - **执行方式**：主程序通过 `std::process::Command` 调用 `python`
-- AI 生成 `normalize.py` 与 `transform.py`，主程序负责调用并捕获输出
+- AI 仅生成 `normalize.py`（Step 2 的规范化脚本）
+- `transform.py`（Step 5 的内容增强脚本）与 `inject_ui.py`（Step 6 的 UI 注入脚本）为主程序内置或预置脚本，不由 AI 生成
 
 ---
 

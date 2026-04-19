@@ -1,0 +1,25 @@
+{
+  "version": "1.0",
+  "document": {
+    "title": "查拉图斯特拉如是说",
+    "language": "zh-CN"
+  },
+  "landmarks": {
+    "book_main_id": "book",
+    "bodymatter_id": "bodymatter",
+    "toc_id": "",
+    "has_toc": false,
+    "has_notes_section": true
+  },
+  "chapters": [],
+  "notes": {
+    "note_ref_count": 0,
+    "notes_section_id": "book-notes"
+  },
+  "unknown_blocks": [],
+  "stats": {
+    "chapter_count": 0,
+    "section_count": 0,
+    "paragraph_count": 0
+  }
+}

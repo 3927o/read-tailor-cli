@@ -1,0 +1,124 @@
+[
+  {
+    "approach": "A: AI生成脚本",
+    "time_seconds": 69.87,
+    "ai_tokens": 11835,
+    "pass": false,
+    "errors": [
+      "章节数 0 < 预期最小值 85",
+      "注释引用 0 < 预期最小值 1200",
+      "未找到 '第一部' 部分",
+      "未找到 '第二部' 部分",
+      "未找到 '第三部' 部分",
+      "未找到 '第四部' 部分"
+    ],
+    "warnings": [
+      "已知章节标题仅找到 0/6，可能章节提取不完整"
+    ],
+    "metrics": {
+      "root_element": "<main> id=book",
+      "bodymatter": "found",
+      "chapter_count": 0,
+      "note_ref_count": 0,
+      "standard_noteref_count": 0,
+      "sample_titles_found": "0/6",
+      "unknown_blocks": 0,
+      "structure_json_chapters": 0,
+      "structure_json_note_refs": 0,
+      "structure_json_paragraphs": "?"
+    }
+  },
+  {
+    "approach": "B: AI输出YAML映射",
+    "time_seconds": 29.81,
+    "ai_tokens": 6582,
+    "pass": false,
+    "errors": [
+      "章节数 80 < 预期最小值 85"
+    ],
+    "warnings": [],
+    "metrics": {
+      "root_element": "<main> id=book",
+      "bodymatter": "found",
+      "chapter_count": 80,
+      "note_ref_count": 1313,
+      "standard_noteref_count": 1313,
+      "sample_titles_found": "6/6",
+      "unknown_blocks": 0,
+      "structure_json_chapters": 80,
+      "structure_json_note_refs": 3786,
+      "structure_json_paragraphs": 10476
+    }
+  },
+  {
+    "approach": "C: AI直接输出HTML",
+    "time_seconds": 40.38,
+    "ai_tokens": 8301,
+    "pass": true,
+    "errors": [],
+    "warnings": [],
+    "metrics": {
+      "root_element": "<main> id=book",
+      "bodymatter": "found",
+      "chapter_count": 90,
+      "note_ref_count": 1377,
+      "standard_noteref_count": 1377,
+      "sample_titles_found": "6/6",
+      "unknown_blocks": 0,
+      "structure_json_chapters": 0,
+      "structure_json_note_refs": 0,
+      "structure_json_paragraphs": 0
+    }
+  },
+  {
+    "approach": "D: 纯规则无AI",
+    "time_seconds": 0.51,
+    "ai_tokens": 0,
+    "pass": true,
+    "errors": [],
+    "warnings": [],
+    "metrics": {
+      "root_element": "<main> id=book",
+      "bodymatter": "found",
+      "chapter_count": 90,
+      "note_ref_count": 1313,
+      "standard_noteref_count": 1313,
+      "sample_titles_found": "6/6",
+      "unknown_blocks": 0,
+      "structure_json_chapters": 90,
+      "structure_json_note_refs": 3840,
+      "structure_json_paragraphs": 10637
+    }
+  },
+  {
+    "approach": "E: 正则预提取+AI",
+    "time_seconds": 48.39,
+    "ai_tokens": 8124,
+    "pass": true,
+    "errors": [],
+    "warnings": [],
+    "metrics": {
+      "root_element": "<main> id=book",
+      "bodymatter": "found",
+      "chapter_count": 90,
+      "note_ref_count": 1313,
+      "standard_noteref_count": 1313,
+      "sample_titles_found": "6/6",
+      "unknown_blocks": 0,
+      "structure_json_chapters": 90,
+      "structure_json_note_refs": 3840,
+      "structure_json_paragraphs": 10637
+    }
+  },
+  {
+    "approach": "F: 约束层级分块",
+    "time_seconds": 14.47,
+    "ai_tokens": 0,
+    "pass": false,
+    "errors": [
+      "执行异常: RuntimeError: 无法解析 AI 响应: : OPENROUTER PROCESSING\n\ndata: {\"id\":\"gen-1776516489-HdsTFppFjGNpaBtYR4C3\",\"object\":\"chat.completion.chunk\",\"created\":1776516489,\"model\":\"xiaomi/mimo-v2-pro-20260318\",\"provider\":\"Xiaomi\",\""
+    ],
+    "warnings": [],
+    "metrics": {}
+  }
+]
