@@ -11,7 +11,7 @@ import tempfile
 from config import AI_BASE_URL, AI_API_KEY, AI_MODEL
 
 
-def call_ai(prompt: str, system: str = "", max_tokens: int = 8000) -> tuple[str, int]:
+def call_ai(prompt: str, system: str = "", max_tokens: int = 32000) -> tuple[str, int]:
     """
     调用 AI 模型（流式），返回 (response_text, total_tokens)。
     """
@@ -26,6 +26,7 @@ def call_ai(prompt: str, system: str = "", max_tokens: int = 8000) -> tuple[str,
         "max_tokens": max_tokens,
         "temperature": 0.1,
         "stream": True,
+        "thinking": {"type": "disabled"},
     }
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
@@ -41,7 +42,7 @@ def call_ai(prompt: str, system: str = "", max_tokens: int = 8000) -> tuple[str,
 
         result = subprocess.run(
             [
-                "curl", "-s", "-N",
+                "curl", "-s", "-N", "--max-time", "600",
                 "-X", "POST",
                 url,
                 "-H", "Content-Type: application/json",
@@ -50,7 +51,7 @@ def call_ai(prompt: str, system: str = "", max_tokens: int = 8000) -> tuple[str,
             ],
             capture_output=True,
             text=True,
-            timeout=180,
+            timeout=660,
         )
 
         if result.returncode != 0:
@@ -63,6 +64,7 @@ def call_ai(prompt: str, system: str = "", max_tokens: int = 8000) -> tuple[str,
         # 解析 SSE 流：data: {...}\n\n 格式
         content_parts = []
         total_tokens = 0
+        finish_reason = None
 
         for line in raw.split("\n"):
             line = line.strip()
@@ -83,12 +85,20 @@ def call_ai(prompt: str, system: str = "", max_tokens: int = 8000) -> tuple[str,
                         delta = choices[0].get("delta", {})
                         if "content" in delta and delta["content"]:
                             content_parts.append(delta["content"])
+                        if choices[0].get("finish_reason"):
+                            finish_reason = choices[0]["finish_reason"]
                     # 提取 usage（通常在最后一个 chunk）
                     usage = chunk.get("usage", {})
                     if usage:
                         total_tokens = usage.get("total_tokens", 0)
                 except json.JSONDecodeError:
                     continue
+
+        if finish_reason == "length" and not content_parts:
+            raise RuntimeError(
+                f"AI 输出被 max_tokens 截断，且全部预算被推理消耗（content 为空）。"
+                f"total_tokens={total_tokens}, 建议把 max_tokens 调到更大或换非推理模型。"
+            )
 
         full_content = "".join(content_parts)
 

@@ -1,208 +1,243 @@
 #!/usr/bin/env python3
-"""
-评估器：对规范化后的 HTML 进行质量评估。
+"""Generic structural evaluator for normalized HTML.
 
-评估维度：
-1. 结构完整性 - 是否包含必要的语义结构
-2. 章节数量 - 是否识别出正确的章节数（预期 90 章）
-3. 注释引用 - noteref 是否保留并格式正确
-4. 前后结构 - 是否区分了 frontmatter / bodymatter / backmatter
-5. HTML 有效性 - 是否有明显的结构性错误
+Replaces the previous book-specific evaluator. Validates only against the
+target normalized HTML contract from `tests/step2_research_clarified.md` §2.
+No book titles, chapter names, or expected counts are hardcoded.
+
+Errors are violations of the contract. Warnings are signals of low quality.
 """
+from __future__ import annotations
+
 import json
-import re
-import time
-from bs4 import BeautifulSoup
+from dataclasses import dataclass, field
+from typing import Any
+
+from bs4 import BeautifulSoup, Tag
 
 
-# 本书的已知 ground truth（基于我们之前的分析）
-GROUND_TRUTH = {
-    "expected_chapters_min": 85,   # 至少识别出 85 章（允许误差）
-    "expected_chapters_max": 95,
-    "expected_note_refs_min": 1200,  # 至少保留 1200 个 noteref
-    "has_frontmatter": True,        # 有译者前言
-    "has_backmatter": True,         # 有译后记
-    "has_notes_section": True,      # 有注释区域
-    "parts": ["第一部", "第二部", "第三部", "第四部"],
-    "known_chapter_titles": [       # 部分已知章节标题，用于抽样检查
-        "三段变化",
-        "道德的讲座",
-        "夜歌",
-        "古老的法版和新的法版",
-        "醉歌",
-        "预兆",
-    ],
-}
-
-
+@dataclass
 class EvalResult:
-    def __init__(self, approach_name: str):
-        self.approach = approach_name
-        self.time_seconds = 0.0
-        self.ai_tokens = 0  # 对于 AI 方案
-        self.errors = []
-        self.warnings = []
-        self.metrics = {}
+    approach: str
+    time_seconds: float = 0.0
+    ai_tokens: int = 0
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    metrics: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self):
+    @property
+    def passed(self) -> bool:
+        return not self.errors
+
+    def to_dict(self) -> dict[str, Any]:
         return {
             "approach": self.approach,
             "time_seconds": round(self.time_seconds, 2),
             "ai_tokens": self.ai_tokens,
-            "pass": len(self.errors) == 0,
+            "pass": self.passed,
             "errors": self.errors,
             "warnings": self.warnings,
             "metrics": self.metrics,
         }
 
-    def summary(self):
-        status = "PASS" if not self.errors else "FAIL"
+    def summary(self) -> str:
+        status = "PASS" if self.passed else "FAIL"
         lines = [f"[{status}] {self.approach} ({self.time_seconds:.1f}s)"]
-        for k, v in self.metrics.items():
-            lines.append(f"  {k}: {v}")
+        for key, value in self.metrics.items():
+            lines.append(f"  {key}: {value}")
         for w in self.warnings:
-            lines.append(f"  ⚠ {w}")
+            lines.append(f"  ! {w}")
         for e in self.errors:
-            lines.append(f"  ✗ {e}")
+            lines.append(f"  x {e}")
         return "\n".join(lines)
 
 
 def evaluate(html_path: str, approach_name: str) -> EvalResult:
-    """评估一个规范化后的 HTML 文件"""
-    result = EvalResult(approach_name)
+    result = EvalResult(approach=approach_name)
+    with open(html_path, "r", encoding="utf-8") as fh:
+        html = fh.read()
+    soup = BeautifulSoup(html, "html.parser")
 
-    with open(html_path, "r", encoding="utf-8") as f:
-        content = f.read()
-
-    soup = BeautifulSoup(content, "html.parser")
-
-    # --- 1. 基础结构检查 ---
-    main = soup.find("main") or soup.find(attrs={"data-type": "book"})
-    if not main:
-        result.errors.append("缺少 main#book 或 data-type='book' 的根元素")
-    else:
-        result.metrics["root_element"] = f"<{main.name}> id={main.get('id', 'none')}"
-
+    # ---- 1. Document skeleton -------------------------------------
+    book = soup.find(attrs={"data-type": "book"})
+    if book is None or book.name != "main":
+        result.errors.append("缺少 main[data-type='book']")
+    elif book.get("id") != "book":
+        result.warnings.append("main[data-type='book'] 缺少 id='book'")
     bodymatter = soup.find(attrs={"data-role": "bodymatter"})
-    if not bodymatter:
-        result.errors.append("缺少 section[data-role='bodymatter']")
-    else:
-        result.metrics["bodymatter"] = "found"
+    if bodymatter is None:
+        result.errors.append("缺少 [data-role='bodymatter']")
 
-    # --- 2. 章节计数 ---
-    chapters = soup.find_all(attrs={"data-type": "chapter"})
-    if not chapters:
-        # fallback: 尝试其他常见模式
-        chapters = soup.find_all("h4")
-        if not chapters:
-            chapters = soup.find_all("section")
-            chapters = [c for c in chapters if c.find(["h1", "h2", "h3", "h4"])]
-
+    # ---- 2. Chapters ----------------------------------------------
+    chapters = (
+        bodymatter.find_all(attrs={"data-type": "chapter"}) if bodymatter else []
+    )
     chapter_count = len(chapters)
     result.metrics["chapter_count"] = chapter_count
+    if chapter_count == 0:
+        result.errors.append("正文中未识别出任何 [data-type='chapter']")
 
-    if chapter_count < GROUND_TRUTH["expected_chapters_min"]:
+    # ---- 3. Per-chapter contract -----------------------------------
+    heading_jump_count = 0
+    chapters_missing_id = 0
+    chapters_first_heading_not_h1 = 0
+    sub_section_count = 0
+    paragraph_count = 0
+    for chapter in chapters:
+        if not chapter.get("id"):
+            chapters_missing_id += 1
+        first_heading = chapter.find(["h1", "h2", "h3", "h4", "h5", "h6"])
+        if first_heading is None or first_heading.name != "h1":
+            chapters_first_heading_not_h1 += 1
+        # Heading-jump check: walk all headings in chapter and ensure
+        # consecutive levels never skip (e.g. h2 -> h4).
+        heading_levels = [
+            int(h.name[1])
+            for h in chapter.find_all(["h1", "h2", "h3", "h4", "h5", "h6"])
+        ]
+        for prev, nxt in zip(heading_levels, heading_levels[1:]):
+            if nxt > prev + 1:
+                heading_jump_count += 1
+        sub_section_count += len(chapter.find_all(attrs={"data-type": "section"}))
+        paragraph_count += len(chapter.find_all("p"))
+
+    if chapters_missing_id:
         result.errors.append(
-            f"章节数 {chapter_count} < 预期最小值 {GROUND_TRUTH['expected_chapters_min']}"
+            f"{chapters_missing_id} 个 chapter 缺少 id 属性"
         )
-    elif chapter_count > GROUND_TRUTH["expected_chapters_max"]:
-        result.warnings.append(
-            f"章节数 {chapter_count} > 预期最大值 {GROUND_TRUTH['expected_chapters_max']}"
-        )
-
-    # --- 3. 注释引用 ---
-    # 查找所有包含 rearnote 或 data-role="noteref" 的链接
-    all_links = soup.find_all("a")
-    note_ref_links = []
-    for a in all_links:
-        href = a.get("href", "")
-        data_role = a.get("data-role", "")
-        cls = " ".join(a.get("class", []))
-        if "rearnote" in href or "noteref" in href or data_role == "noteref" or "noteref" in cls:
-            note_ref_links.append(a)
-
-    note_ref_count = len(note_ref_links)
-    result.metrics["note_ref_count"] = note_ref_count
-
-    if note_ref_count < GROUND_TRUTH["expected_note_refs_min"]:
+    if chapters_first_heading_not_h1:
         result.errors.append(
-            f"注释引用 {note_ref_count} < 预期最小值 {GROUND_TRUTH['expected_note_refs_min']}"
+            f"{chapters_first_heading_not_h1} 个 chapter 的首个标题不是 h1"
         )
-
-    # 检查 noteref 标准化程度
-    standard_refs = [a for a in note_ref_links if a.get("data-role") == "noteref"]
-    result.metrics["standard_noteref_count"] = len(standard_refs)
-    if len(standard_refs) < note_ref_count * 0.8:
+    if heading_jump_count:
         result.warnings.append(
-            f"标准化 noteref 仅 {len(standard_refs)}/{note_ref_count}，"
-            f"可能未正确转换格式"
+            f"检测到 {heading_jump_count} 处标题层级跳级（如 h2 直接跳到 h4）"
         )
+    result.metrics["section_count"] = sub_section_count
+    result.metrics["paragraph_count"] = paragraph_count
+    result.metrics["heading_jump_count"] = heading_jump_count
 
-    # --- 4. 前言/后记 ---
-    frontmatter = soup.find(attrs={"data-role": "frontmatter"})
-    if GROUND_TRUTH["has_frontmatter"] and not frontmatter:
-        # 也检查是否有译者前言标题
-        has_preface = any("译者前言" in (h.get_text() if hasattr(h, "get_text") else "") for h in soup.find_all(["h1", "h2"]))
-        if not has_preface:
-            result.warnings.append("未识别出译者前言（frontmatter）")
-
-    backmatter = soup.find(attrs={"data-role": "backmatter"})
-    if GROUND_TRUTH["has_backmatter"] and not backmatter:
-        has_postscript = any("译后记" in (h.get_text() if hasattr(h, "get_text") else "") for h in soup.find_all(["h1", "h2"]))
-        if not has_postscript:
-            result.warnings.append("未识别出译后记（backmatter）")
-
-    # --- 5. 四部结构 ---
-    body_text = soup.get_text()
-    for part_name in GROUND_TRUTH["parts"]:
-        if part_name not in body_text:
-            result.errors.append(f"未找到 '{part_name}' 部分")
-
-    # --- 6. 已知章节标题抽样 ---
-    found_titles = 0
-    for title in GROUND_TRUTH["known_chapter_titles"]:
-        headings = soup.find_all(["h1", "h2", "h3", "h4", "h5"])
-        for h in headings:
-            text = h.get_text(strip=True) if hasattr(h, "get_text") else ""
-            if title in text:
-                found_titles += 1
-                break
-
-    result.metrics["sample_titles_found"] = f"{found_titles}/{len(GROUND_TRUTH['known_chapter_titles'])}"
-    if found_titles < len(GROUND_TRUTH["known_chapter_titles"]) * 0.5:
+    # ---- 4. Note refs / note bodies --------------------------------
+    noterefs = soup.find_all(attrs={"data-role": "noteref"})
+    notes = soup.find_all(attrs={"data-role": "note"})
+    note_ids = {n.get("id") for n in notes if n.get("id")}
+    notes_without_id = sum(1 for n in notes if not n.get("id"))
+    orphan_refs = 0
+    for ref in noterefs:
+        href = (ref.get("href") or "").strip()
+        if not href.startswith("#"):
+            orphan_refs += 1
+            continue
+        target = href[1:]
+        if target not in note_ids:
+            orphan_refs += 1
+    result.metrics["noteref_count"] = len(noterefs)
+    result.metrics["note_count"] = len(notes)
+    result.metrics["noteref_to_note_orphan_count"] = orphan_refs
+    if notes_without_id:
+        result.errors.append(f"{notes_without_id} 个 note 缺少 id")
+    if noterefs and len(notes) == 0:
+        result.errors.append("存在 noteref 但没有任何 note 正文")
+    if orphan_refs and len(notes):
         result.warnings.append(
-            f"已知章节标题仅找到 {found_titles}/{len(GROUND_TRUTH['known_chapter_titles'])}，"
-            f"可能章节提取不完整"
+            f"{orphan_refs} 个 noteref 指向不存在的 note id"
         )
 
-    # --- 7. 注释区域 ---
-    notes_section = soup.find(attrs={"data-role": "notes"})
-    if GROUND_TRUTH["has_notes_section"] and not notes_section:
-        result.warnings.append("未找到 section[data-role='notes'] 注释区域")
+    # ---- 5. Banned tags --------------------------------------------
+    banned_b = len(soup.find_all("b"))
+    banned_i = len(soup.find_all("i"))
+    if banned_b:
+        result.errors.append(f"出现 {banned_b} 个 <b> (应为 <strong>)")
+    if banned_i:
+        result.errors.append(f"出现 {banned_i} 个 <i> (应为 <em>)")
 
-    # --- 8. unknown blocks ---
-    unknowns = soup.find_all(attrs={"data-role": "unknown"})
-    result.metrics["unknown_blocks"] = len(unknowns)
+    # ---- 6. Unknown blocks (warning if very high) ------------------
+    unknown_blocks = soup.find_all(attrs={"data-role": "unknown"})
+    result.metrics["unknown_block_count"] = len(unknown_blocks)
+    total_blocks = len(soup.find_all(["section", "p", "div"]))
+    if total_blocks and len(unknown_blocks) / max(total_blocks, 1) > 0.20:
+        result.warnings.append(
+            f"unknown 区块占比偏高 ({len(unknown_blocks)}/{total_blocks})"
+        )
+
+    # ---- 7. TOC (informational) ------------------------------------
+    toc = soup.find(attrs={"data-role": "toc"})
+    result.metrics["has_toc"] = toc is not None
 
     return result
 
 
-def evaluate_structure_json(json_path: str, result: EvalResult):
-    """额外检查 structure.json 的正确性"""
+def evaluate_structure_json(json_path: str, result: EvalResult) -> None:
+    """Validate that structure.json conforms to the minimal schema shape."""
     try:
-        with open(json_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        chapters = data.get("chapters", [])
-        result.metrics["structure_json_chapters"] = len(chapters)
-
-        total_note_refs = sum(c.get("note_ref_count", 0) for c in chapters)
-        result.metrics["structure_json_note_refs"] = total_note_refs
-
-        stats = data.get("stats", {})
-        result.metrics["structure_json_paragraphs"] = stats.get("paragraph_count", "?")
-
+        with open(json_path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
     except FileNotFoundError:
         result.warnings.append("structure.json 不存在")
-    except json.JSONDecodeError:
-        result.errors.append("structure.json 格式错误")
+        return
+    except json.JSONDecodeError as exc:
+        result.errors.append(f"structure.json 解析失败: {exc}")
+        return
+
+    required_top = ("version", "document", "landmarks", "chapters")
+    for key in required_top:
+        if key not in data:
+            result.errors.append(f"structure.json 缺少字段 {key}")
+
+    chapters = data.get("chapters") or []
+    result.metrics["structure_json_chapter_count"] = len(chapters)
+
+    landmarks = data.get("landmarks") or {}
+    for key in ("book_main_id", "bodymatter_id", "has_toc", "has_notes_section"):
+        if key not in landmarks:
+            result.warnings.append(f"structure.json.landmarks 缺少 {key}")
+
+    stats = data.get("stats") or {}
+    if stats:
+        result.metrics["structure_json_paragraph_count"] = stats.get(
+            "paragraph_count", "?"
+        )
+
+
+# ---- self-check (optional) -----------------------------------------
+
+
+_PASS_SAMPLE = """<!doctype html><html lang="zh"><head><title>X</title></head><body>
+<main id="book" data-type="book">
+  <section id="bodymatter" data-role="bodymatter">
+    <section class="chapter" data-type="chapter" id="ch-001">
+      <h1>One</h1>
+      <p>x <a data-role="noteref" href="#note-0001" id="r1">[1]</a></p>
+    </section>
+  </section>
+  <section data-role="notes" id="book-notes"><div data-role="note" id="note-0001">a</div></section>
+</main></body></html>"""
+
+_FAIL_SAMPLE = """<!doctype html><html><head><title>X</title></head><body>
+<article><h2>One</h2><b>bad</b></article>
+</body></html>"""
+
+
+def _self_check() -> None:
+    import os
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ok_path = os.path.join(tmp, "ok.html")
+        bad_path = os.path.join(tmp, "bad.html")
+        with open(ok_path, "w", encoding="utf-8") as fh:
+            fh.write(_PASS_SAMPLE)
+        with open(bad_path, "w", encoding="utf-8") as fh:
+            fh.write(_FAIL_SAMPLE)
+        ok_result = evaluate(ok_path, "self-check-pass")
+        bad_result = evaluate(bad_path, "self-check-fail")
+        print(ok_result.summary())
+        print()
+        print(bad_result.summary())
+        assert ok_result.passed, "minimal pass sample should pass"
+        assert not bad_result.passed, "minimal fail sample should fail"
+        print("\nself-check OK")
+
+
+if __name__ == "__main__":
+    _self_check()

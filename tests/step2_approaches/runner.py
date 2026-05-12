@@ -1,170 +1,156 @@
 #!/usr/bin/env python3
-"""
-测试运行器：依次执行 6 个方案，收集结果并生成对比报告。
+"""Run plan_1..plan_6 and produce a comparison report.
 
-用法：
-  python3 runner.py              # 跑所有方案
-  python3 runner.py --plan B D   # 只跑方案 B 和 D
-  python3 runner.py --eval-only  # 只评估已有输出（不重新生成）
+Usage:
+  python3 runner.py                 # run all 6 plans
+  python3 runner.py --plan 1 4 6    # run a subset
+  python3 runner.py --eval-only     # only evaluate existing outputs
 """
+from __future__ import annotations
+
+import importlib
 import json
 import os
 import sys
 import time
-import importlib
 
-from config import TEST_OUTPUT_DIR, RESULTS_FILE, RAW_HTML
-from evaluator import evaluate, evaluate_structure_json, EvalResult
+from config import RAW_HTML, RESULTS_FILE, TEST_OUTPUT_DIR
+from evaluator import EvalResult, evaluate, evaluate_structure_json
 
 
-APPROACHES = {
-    "A": {
-        "name": "A: AI生成脚本",
-        "script": "plan_a_ai_gen_script",
-        "output_html": "plan_a.normalized.html",
-        "output_structure": "plan_a.structure.json",
+PLANS: dict[str, dict[str, str]] = {
+    "1": {
+        "name": "1: AI script + full outline",
+        "module": "plan_1_script_full",
+        "html": "plan_1.normalized.html",
+        "structure": "plan_1.structure.json",
     },
-    "B": {
-        "name": "B: AI输出YAML映射",
-        "script": "plan_b_ai_yaml_mapping",
-        "output_html": "plan_b.normalized.html",
-        "output_structure": "plan_b.structure.json",
+    "2": {
+        "name": "2: AI script + trimmed outline",
+        "module": "plan_2_script_trimmed",
+        "html": "plan_2.normalized.html",
+        "structure": "plan_2.structure.json",
     },
-    "C": {
-        "name": "C: AI直接输出HTML",
-        "script": "plan_c_ai_direct_html",
-        "output_html": "plan_c.normalized.html",
-        "output_structure": "plan_c.structure.json",
+    "3": {
+        "name": "3: AI script + facts",
+        "module": "plan_3_script_facts",
+        "html": "plan_3.normalized.html",
+        "structure": "plan_3.structure.json",
     },
-    "D": {
-        "name": "D: 纯规则无AI",
-        "script": "plan_d_heuristic",
-        "output_html": "plan_d.normalized.html",
-        "output_structure": "plan_d.structure.json",
+    "4": {
+        "name": "4: AI IR + full outline",
+        "module": "plan_4_ir_full",
+        "html": "plan_4.normalized.html",
+        "structure": "plan_4.structure.json",
     },
-    "E": {
-        "name": "E: 正则预提取+AI",
-        "script": "plan_e_regex_ai",
-        "output_html": "plan_e.normalized.html",
-        "output_structure": "plan_e.structure.json",
+    "5": {
+        "name": "5: AI IR + trimmed outline",
+        "module": "plan_5_ir_trimmed",
+        "html": "plan_5.normalized.html",
+        "structure": "plan_5.structure.json",
     },
-    "F": {
-        "name": "F: 约束层级分块",
-        "script": "plan_f_constrained",
-        "output_html": "plan_f.normalized.html",
-        "output_structure": "plan_f.structure.json",
+    "6": {
+        "name": "6: AI IR + facts",
+        "module": "plan_6_ir_facts",
+        "html": "plan_6.normalized.html",
+        "structure": "plan_6.structure.json",
     },
 }
 
 
-def run_approach(plan_id: str, eval_only: bool = False) -> EvalResult:
-    """运行单个方案并评估"""
-    info = APPROACHES[plan_id]
-    output_html = os.path.join(TEST_OUTPUT_DIR, info["output_html"])
-    output_structure = os.path.join(TEST_OUTPUT_DIR, info["output_structure"])
-
-    result = EvalResult(info["name"])
+def run_plan(plan_id: str, eval_only: bool = False) -> EvalResult:
+    info = PLANS[plan_id]
+    output_html = os.path.join(TEST_OUTPUT_DIR, info["html"])
+    output_structure = os.path.join(TEST_OUTPUT_DIR, info["structure"])
+    result = EvalResult(approach=info["name"])
 
     if not eval_only:
-        print(f"\n{'='*60}")
-        print(f"  Running: {info['name']}")
-        print(f"{'='*60}")
-
-        # 动态加载方案脚本
+        print(f"\n{'=' * 60}\n  Running: {info['name']}\n{'=' * 60}")
         try:
-            module = importlib.import_module(info["script"])
-        except Exception as e:
-            result.errors.append(f"加载脚本失败: {e}")
+            module = importlib.import_module(info["module"])
+        except Exception as exc:
+            result.errors.append(f"加载脚本失败: {type(exc).__name__}: {exc}")
             print(result.summary())
             return result
-
         start = time.time()
         try:
-            ai_tokens = module.run(RAW_HTML, output_html, output_structure)
-            result.ai_tokens = ai_tokens or 0
-        except Exception as e:
+            tokens = module.run(RAW_HTML, output_html, output_structure)
+            result.ai_tokens = int(tokens or 0)
+        except Exception as exc:
             result.time_seconds = time.time() - start
-            result.errors.append(f"执行异常: {type(e).__name__}: {str(e)[:200]}")
+            msg = str(exc)
+            if len(msg) > 300:
+                msg = msg[:300] + "..."
+            result.errors.append(f"执行异常: {type(exc).__name__}: {msg}")
             print(result.summary())
             return result
-
         result.time_seconds = time.time() - start
         print(f"  完成，耗时 {result.time_seconds:.1f}s")
 
-    # 评估输出
     if os.path.exists(output_html):
         eval_result = evaluate(output_html, info["name"])
-        # 合并评估结果到 result
         result.errors.extend(eval_result.errors)
         result.warnings.extend(eval_result.warnings)
         result.metrics.update(eval_result.metrics)
-
         if os.path.exists(output_structure):
             evaluate_structure_json(output_structure, result)
-    else:
-        if not eval_only:
-            result.errors.append(f"输出文件不存在: {output_html}")
+    elif not eval_only:
+        result.errors.append(f"输出文件不存在: {output_html}")
 
     print(result.summary())
     return result
 
 
-def print_comparison(all_results: list[dict]):
-    """打印对比表"""
-    print(f"\n{'='*80}")
-    print("  方案对比")
-    print(f"{'='*80}")
-    print(f"{'方案':<25} {'耗时(s)':>8} {'章节数':>8} {'注释引用':>10} {'标准noteref':>12} {'状态':>6}")
-    print("-" * 80)
-
+def print_comparison(all_results: list[dict]) -> None:
+    print(f"\n{'=' * 80}\n  方案对比\n{'=' * 80}")
+    header = (
+        f"{'方案':<32} {'耗时(s)':>8} {'tokens':>8} {'章节':>5} "
+        f"{'noteref':>8} {'note':>5} {'orphan':>7} {'jump':>5} {'状态':>6}"
+    )
+    print(header)
+    print("-" * len(header))
     for r in all_results:
         m = r.get("metrics", {})
         status = "PASS" if r.get("pass") else "FAIL"
         print(
-            f"{r['approach']:<25} "
+            f"{r['approach']:<32} "
             f"{r['time_seconds']:>8.1f} "
-            f"{m.get('chapter_count', '?'):>8} "
-            f"{m.get('note_ref_count', '?'):>10} "
-            f"{m.get('standard_noteref_count', '?'):>12} "
+            f"{r['ai_tokens']:>8} "
+            f"{m.get('chapter_count', '?'):>5} "
+            f"{m.get('noteref_count', '?'):>8} "
+            f"{m.get('note_count', '?'):>5} "
+            f"{m.get('noteref_to_note_orphan_count', '?'):>7} "
+            f"{m.get('heading_jump_count', '?'):>5} "
             f"{status:>6}"
         )
-
-    print("-" * 80)
-
-    # 详细警告
-    print("\n各方案详情：")
+    print("-" * len(header))
     for r in all_results:
-        if r.get("warnings") or r.get("errors"):
+        if r.get("errors") or r.get("warnings"):
             print(f"\n  {r['approach']}:")
             for e in r.get("errors", []):
-                print(f"    ✗ {e}")
+                print(f"    x {e}")
             for w in r.get("warnings", []):
-                print(f"    ⚠ {w}")
+                print(f"    ! {w}")
 
 
-def main():
+def main() -> None:
     eval_only = "--eval-only" in sys.argv
-    plan_filter = None
+    plan_filter: list[str] | None = None
     if "--plan" in sys.argv:
         idx = sys.argv.index("--plan")
-        plan_filter = sys.argv[idx + 1:]
-
-    plans_to_run = plan_filter or list(APPROACHES.keys())
+        plan_filter = [arg for arg in sys.argv[idx + 1 :] if not arg.startswith("--")]
+    plans_to_run = plan_filter or list(PLANS.keys())
 
     all_results = []
     for plan_id in plans_to_run:
-        if plan_id not in APPROACHES:
+        if plan_id not in PLANS:
             print(f"Unknown plan: {plan_id}")
             continue
-        result = run_approach(plan_id, eval_only=eval_only)
-        all_results.append(result.to_dict())
+        all_results.append(run_plan(plan_id, eval_only=eval_only).to_dict())
 
-    # 保存结果
-    with open(RESULTS_FILE, "w", encoding="utf-8") as f:
-        json.dump(all_results, f, ensure_ascii=False, indent=2)
+    with open(RESULTS_FILE, "w", encoding="utf-8") as fh:
+        json.dump(all_results, fh, ensure_ascii=False, indent=2)
     print(f"\n结果已保存到 {RESULTS_FILE}")
-
-    # 打印对比
     print_comparison(all_results)
 
 
