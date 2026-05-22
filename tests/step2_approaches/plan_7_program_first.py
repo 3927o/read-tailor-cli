@@ -166,26 +166,46 @@ def detect_note_pairs(body: Tag) -> tuple[list[Tag], dict[int, str]]:
         if not href.startswith("#"):
             continue
         target = id_index.get(href[1:])
-        if not isinstance(target, Tag) or target.name != "a":
+        if not isinstance(target, Tag):
             continue
-        back = (target.get("href") or "").strip()
-        if not back.startswith("#") or back[1:] != (a.get("id") or ""):
-            continue  # require a genuine bidirectional link
 
-        a_block = _block_ancestor(a)
-        t_block = _block_ancestor(target)
-        a_first = _first_in_block(a, a_block)
-        t_first = _first_in_block(target, t_block)
-        if a_first and not t_first:
-            note_anchor, note_block = a, a_block
+        if target.name == "a":
+            # The note id sits on an anchor; the note body is the block that
+            # anchor opens, and that anchor must point back to this ref.
+            back = (target.get("href") or "").strip()
+            if not back.startswith("#") or back[1:] != (a.get("id") or ""):
+                continue  # require a genuine bidirectional link
+            a_block = _block_ancestor(a)
+            t_block = _block_ancestor(target)
+            a_first = _first_in_block(a, a_block)
+            t_first = _first_in_block(target, t_block)
+            if a_first and not t_first:
+                note_anchor, note_block = a, a_block
+            else:
+                note_anchor, note_block = target, t_block
+            note_key = note_anchor.get("id") or ""
         else:
-            note_anchor, note_block = target, t_block
+            # Pandoc-footnote layout: the note id sits on the note body block
+            # itself (e.g. <li id="fn1">), which contains a back-anchor
+            # pointing to this in-text ref's id.
+            ref_id = a.get("id") or ""
+            if not ref_id:
+                continue
+            note_block = target if target.name in BLOCK_TAGS else _block_ancestor(target)
+            if note_block is None or note_block is _block_ancestor(a):
+                continue
+            if not any(
+                (bk.get("href") or "").strip()[1:] == ref_id
+                for bk in note_block.find_all("a", href=True)
+            ):
+                continue  # no back-link -> not a note body
+            note_key = target.get("id") or ""
 
         if note_block is None or id(note_block) in seen:
             continue
         seen.add(id(note_block))
         note_blocks.append(note_block)
-        note_anchor_id_by_block[id(note_block)] = note_anchor.get("id") or ""
+        note_anchor_id_by_block[id(note_block)] = note_key
 
     return note_blocks, note_anchor_id_by_block
 
@@ -255,6 +275,13 @@ def build_normalized(raw_html: str, decisions: dict[int, dict], doc_meta: dict) 
             a["id"] = f"ref-{ref_counter:05d}"
         ref_counter += 1
 
+    # Detach note bodies from the working tree so the content walk does not
+    # also emit them inline (e.g. when they sit inside a shared
+    # <section class="footnotes"> wrapper). They are re-attached in the notes
+    # section below; detached nodes remain usable for cloning.
+    for b in note_blocks:
+        b.extract()
+
     # --- output skeleton ---
     out = BeautifulSoup("", "html.parser")
     html = out.new_tag("html", lang=(doc_meta.get("language") or "und"))
@@ -315,27 +342,40 @@ def build_normalized(raw_html: str, decisions: dict[int, dict], doc_meta: dict) 
         target = stack[-1]["section"] if stack else bodymatter
         target.append(_clone(out, node))
 
-    for block in list(body.children):
-        if not isinstance(block, Tag):
-            continue
-        if id(block) in in_note or block.name == "hr":
-            continue
-        if block.name in HEADINGS:
-            idx = head_index.get(id(block))
-            decision = decisions.get(idx, {}) if idx is not None else {}
-            text = block.get_text(strip=True)
-            if decision.get("skip"):
+    def process(node: Tag) -> None:
+        # Document-order walk that splits content at headings. Headings are
+        # NOT always direct children of <body>: pandoc/calibre often wrap
+        # each heading + its content in a <section>/<div>. So descend into
+        # any element that encloses a heading, and treat heading-free
+        # elements as atomic content blocks.
+        for block in list(node.children):
+            if not isinstance(block, Tag):
                 continue
-            if decision.get("merge"):
-                pending_prefix.append(text)
+            if id(block) in in_note or block.name == "hr":
                 continue
-            try:
-                level = max(1, int(decision.get("level") or 1))
-            except (TypeError, ValueError):
-                level = 1
-            open_section(level, block)
-            continue
-        attach_content(block)
+            if block.name in HEADINGS:
+                idx = head_index.get(id(block))
+                decision = decisions.get(idx, {}) if idx is not None else {}
+                text = block.get_text(strip=True)
+                if decision.get("skip"):
+                    continue
+                if decision.get("merge"):
+                    pending_prefix.append(text)
+                    continue
+                try:
+                    level = max(1, int(decision.get("level") or 1))
+                except (TypeError, ValueError):
+                    level = 1
+                open_section(level, block)
+                continue
+            if block.find(HEADINGS):
+                process(block)
+            elif block.get_text(strip=True) or block.find(
+                ["img", "svg", "picture", "audio", "video"]
+            ):
+                attach_content(block)
+
+    process(body)
 
     if note_blocks:
         notes_sec = out.new_tag("section", id="book-notes")
