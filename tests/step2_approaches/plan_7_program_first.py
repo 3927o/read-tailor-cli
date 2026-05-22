@@ -70,6 +70,14 @@ Rules:
   and sample texts, NOT from the raw tag number. The chapter level is the
   top reading unit; it is frequently NOT the most common heading (the most
   common one is usually the deepest sub-section).
+- Each signature includes "lines": the source line numbers (in document
+  order) where its headings occur. Use them to infer RELATIVE level by
+  containment: if one signature's occurrences BRACKET many occurrences of
+  another (its line range spans across them), the bracketing one is a
+  HIGHER level (smaller "level" number). For example, a "part" heading
+  whose two occurrences enclose several chapter headings sits ABOVE those
+  chapters and must get a SMALLER level number than them. Never give a
+  bracketing heading a larger level number than the headings it encloses.
 - Copy each "signature" string verbatim from the input.
 - Output ONLY the JSON object, no commentary.
 """
@@ -83,10 +91,12 @@ def _signatures(body: Tag) -> list[dict]:
         sig = f"{h.name}|{cls}"
         entry = index.get(sig)
         if entry is None:
-            entry = {"signature": sig, "count": 0, "samples": []}
+            entry = {"signature": sig, "count": 0, "lines": [], "samples": []}
             index[sig] = entry
             out.append(entry)
         entry["count"] += 1
+        if h.sourceline is not None:
+            entry["lines"].append(h.sourceline)
         txt = h.get_text(strip=True)
         if txt and len(entry["samples"]) < 6:
             entry["samples"].append(txt[:40])
