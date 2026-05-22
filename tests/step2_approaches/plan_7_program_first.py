@@ -281,10 +281,7 @@ def build_normalized(raw_html: str, decisions: dict[int, dict], doc_meta: dict) 
     chap_counter = [0]
     pending_prefix: list[str] = []
 
-    def open_section(ai_level: int, title_text: str) -> None:
-        if pending_prefix:
-            title_text = " ".join([*pending_prefix, title_text]).strip()
-            pending_prefix.clear()
+    def open_section(ai_level: int, source_heading: Tag) -> None:
         while stack and stack[-1]["level"] >= ai_level:
             stack.pop()
         depth = len(stack) + 1
@@ -299,7 +296,17 @@ def build_normalized(raw_html: str, decisions: dict[int, dict], doc_meta: dict) 
         else:
             sec.attrs["data-type"] = "section"
             heading = out.new_tag(f"h{min(depth, 6)}")
-        heading.string = title_text
+        # Preserve the heading's full content (text + inline media such as
+        # <img>) rather than flattening to plain text — flattening dropped
+        # images embedded inside chapter titles.
+        if pending_prefix:
+            heading.append(out.new_string(" ".join(pending_prefix).strip() + " "))
+            pending_prefix.clear()
+        for child in source_heading.children:
+            if isinstance(child, NavigableString):
+                heading.append(out.new_string(str(child)))
+            elif isinstance(child, Tag):
+                heading.append(_clone(out, child))
         sec.append(heading)
         parent.append(sec)
         stack.append({"level": ai_level, "section": sec, "heading": heading})
@@ -326,7 +333,7 @@ def build_normalized(raw_html: str, decisions: dict[int, dict], doc_meta: dict) 
                 level = max(1, int(decision.get("level") or 1))
             except (TypeError, ValueError):
                 level = 1
-            open_section(level, text)
+            open_section(level, block)
             continue
         attach_content(block)
 
