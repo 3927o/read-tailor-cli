@@ -76,7 +76,14 @@ def apply_ir(raw_html: str, ir: dict[str, Any]) -> str:
                 sub_title_to_meta[id(matched)] = sub
 
     notes_policy = ir.get("notes") or {}
-    note_body_nodes, original_note_ids = _collect_notes(body, notes_policy)
+    noterefs_policy = ir.get("noterefs") or {}
+    strategy = (notes_policy.get("strategy") or "container").strip()
+    if strategy == "by-ref-target":
+        note_body_nodes, original_note_ids = _collect_notes_by_ref(
+            body, noterefs_policy, notes_policy
+        )
+    else:
+        note_body_nodes, original_note_ids = _collect_notes(body, notes_policy)
     in_note: set[int] = set()
     for nb in note_body_nodes:
         in_note.add(id(nb))
@@ -92,7 +99,6 @@ def apply_ir(raw_html: str, ir: dict[str, Any]) -> str:
         for d in c.descendants:
             in_notes_container.add(id(d))
 
-    noterefs_policy = ir.get("noterefs") or {}
     noteref_id_map = _build_note_id_map(original_note_ids)
     _rewrite_noterefs(body, noterefs_policy, noteref_id_map)
 
@@ -395,6 +401,51 @@ def _collect_notes(body: Tag, policy: dict[str, Any]) -> tuple[list[Tag], list[s
     return bodies, ids
 
 
+def _collect_notes_by_ref(
+    body: Tag, noterefs_policy: dict[str, Any], notes_policy: dict[str, Any]
+) -> tuple[list[Tag], list[str]]:
+    """Resolve note bodies by following each in-text noteref to its target.
+
+    For books that scatter note bodies with no shared container: the note
+    body is the nearest block-level ancestor of the element whose id equals
+    the noteref's href target. Targets are matched by exact attribute
+    equality (not CSS), so pandoc ids containing '#'/'.' still resolve.
+    """
+    selector = (noterefs_policy or {}).get("selector") or ""
+    if not selector:
+        return [], []
+    block_tags = (notes_policy or {}).get("body_block_tags") or [
+        "p", "div", "li", "section", "blockquote", "aside",
+    ]
+    bodies: list[Tag] = []
+    ids: list[str] = []
+    seen_targets: set[str] = set()
+    seen_blocks: set[int] = set()
+    for ref in body.select(selector):
+        href = (ref.get("href") or "").strip()
+        if not href.startswith("#"):
+            continue
+        target = href[1:]
+        if not target or target in seen_targets:
+            continue
+        node = body.find(attrs={"id": target})
+        if not isinstance(node, Tag):
+            continue
+        block = node
+        while block is not None and block is not body and block.name not in block_tags:
+            parent = block.parent
+            block = parent if isinstance(parent, Tag) else None
+        if block is None or block is body:
+            block = node
+        if id(block) in seen_blocks:
+            continue
+        seen_targets.add(target)
+        seen_blocks.add(id(block))
+        bodies.append(block)
+        ids.append(target)
+    return bodies, ids
+
+
 def _build_note_id_map(original_note_ids: list[str]) -> dict[str, str]:
     id_map: dict[str, str] = {}
     counter = 1
@@ -410,22 +461,16 @@ def _rewrite_noterefs(
     body: Tag, policy: dict[str, Any], note_id_map: dict[str, str]
 ) -> int:
     selector = (policy or {}).get("selector") or ""
-    href_pattern = (policy or {}).get("href_pattern") or ""
-    if not selector or not href_pattern or "{n}" not in href_pattern:
+    if not selector:
         return 0
-    # Pattern is used only to filter which <a> tags qualify as noterefs;
-    # actual note resolution is done by direct href-target lookup against
-    # the original note ids.
-    pattern = re.compile(
-        "^" + re.escape(href_pattern).replace(r"\{n\}", r"[^\"#]+") + "$"
-    )
+    # The authoritative gate is whether the href target resolves to a known
+    # note id. pandoc ids may embed '#'/'.', so we match by exact target
+    # lookup rather than a fragile href_pattern regex.
     rewritten = 0
     counter = 1
     for node in body.select(selector):
         href = (node.get("href") or "").strip()
         if not href.startswith("#"):
-            continue
-        if not pattern.match(href):
             continue
         target_id = href[1:]
         new_id = note_id_map.get(target_id)

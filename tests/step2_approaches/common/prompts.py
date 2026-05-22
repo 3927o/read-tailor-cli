@@ -225,6 +225,26 @@ Selector / pattern rules:
   the numeric/identifier portion, e.g. "#fn-{{n}}" or "#rearnote_{{n}}".
 - If a region is genuinely unidentifiable, list it under "unknowns" with
   a structural selector and a short structural reason — do NOT guess.
+
+Notes strategy — pick based on how note bodies are laid out:
+- If every note body lives inside ONE shared wrapper (e.g. a trailing
+  <section>/<div>), use notes.strategy "container" with
+  container_selector + item_selector.
+- If note bodies are SCATTERED with no shared wrapper — common in
+  pandoc-from-EPUB output, where each note body is a bare <p> that
+  follows the chapter text — use notes.strategy "by-ref-target". The
+  engine follows each in-text noteref's href to the element carrying
+  that id and treats its nearest block ancestor as the note body; no
+  container is needed.
+- When unsure for pandoc EPUB output, prefer "by-ref-target".
+- For "by-ref-target", noterefs.selector MUST match ONLY the in-text
+  reference anchors, never the back-anchors inside the note bodies
+  themselves (otherwise body paragraphs get mistaken for notes). Use the
+  reference anchors' own structural context to disambiguate.
+- ids in pandoc output may contain non-CSS-safe characters (e.g. '#' or
+  '.'). The engine resolves note targets by exact attribute equality, so
+  by-ref-target still works when such ids cannot be addressed via a
+  normal CSS '#id' selector.
 """
 
 

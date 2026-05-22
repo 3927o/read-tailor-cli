@@ -112,9 +112,16 @@ SCHEMA_JSON_DESCRIPTION = """\
     "id_strategy": "preserve|regenerate"
   },
   "notes": {                                      // optional; omit by setting container=""
+    "strategy": "container|by-ref-target",        // default "container"
+    // strategy "container" — note bodies share one wrapper element:
     "container_selector": "string",               // CSS selector for notes container
     "item_selector": "string",                    // CSS selector relative to container
     "item_id_attr": "id|data-id|...",             // attribute carrying note id
+    // strategy "by-ref-target" — note bodies are scattered, no shared
+    // wrapper; engine follows each noteref href to the element with that
+    // id (matched by exact attribute equality, so ids containing '#'/'.'
+    // still resolve) and takes its nearest block ancestor as the note body:
+    "body_block_tags": ["p", "div", "li"],        // block tags that may hold a note body
     "kind_hint": "footnote|endnote|chapter-note|unknown"
   },
   "unknowns": [                                   // 0..N unknown regions to preserve
@@ -159,8 +166,17 @@ def validate(ir: dict[str, Any]) -> list[str]:
         if noterefs.get("id_strategy") not in {"preserve", "regenerate"}:
             errors.append("noterefs.id_strategy must be 'preserve' or 'regenerate'")
     notes = ir.get("notes")
-    if notes and isinstance(notes, dict) and notes.get("container_selector"):
-        if not notes.get("item_selector"):
+    if notes and isinstance(notes, dict):
+        strategy = notes.get("strategy") or "container"
+        if strategy not in {"container", "by-ref-target"}:
+            errors.append("notes.strategy must be 'container' or 'by-ref-target'")
+        if strategy == "by-ref-target":
+            nr = ir.get("noterefs")
+            if not (isinstance(nr, dict) and nr.get("selector")):
+                errors.append(
+                    "notes.strategy 'by-ref-target' requires noterefs.selector"
+                )
+        elif notes.get("container_selector") and not notes.get("item_selector"):
             errors.append("notes.item_selector is required when container is set")
     unknowns = ir.get("unknowns") or []
     if not isinstance(unknowns, list):
