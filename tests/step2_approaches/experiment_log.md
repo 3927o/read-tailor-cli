@@ -438,3 +438,145 @@ class="footnotes">` + `<li>` 列表，每条带 ↩︎ 反向链接。
 4. plan_4/5/6（IR 路线）的彻底放弃 vs 重新设计
 5. 选定主路线后，把 prompt + facts + script 模式回写到 Rust pipeline
    `src/pipeline/steps.rs::step2_normalize`
+
+---
+
+# 第二轮：IR 反查方案 + 方案 7（程序优先 + AI 只做语义）
+
+实验时间：2026-05-22
+模型：`deepseek-v4-pro`（`https://api.deepseek.com`，OpenAI 兼容协议，
+curl 流式）
+样本书：《可能性的艺术：比较政治学30讲》（刘瑜）、
+《置身事内：中国政府与经济发展》（兰小欢）
+
+## 15. 起因：重新审视 IR 的"逐章/逐注 selector"模式
+
+跑 plan_1-6 时确认了第一轮的结论：IR 路线（plan_4-6）让 AI 给"逐章
+title_selector + 逐注 selector"，规模一上去就塌方，且注释经常 0 识别。
+具体诊断：
+
+- **章节数严重错**：plan_4 在某本上只识 3 章（selector 把多章塌缩成一个
+  命中），plan_3 在另一本识到 117 章（把 h3 叶子节点全当章节）。两个极端
+  的同一个 root cause —— **"挑一个扁平 heading level 当章节"本身就是错的**。
+- **note ground-truth 厘清**：plan_3 报 66 条注释，实为虚标 —— 它把每对
+  noteref 的两个锚点都算成 note，66 = 33×2，且 note body 是空壳。真实注释
+  数是 **33 条**（每条 ~85 字正文）。
+
+## 16. 给 IR 增加 by-ref-target（反查）注释方案
+
+针对 pandoc-from-EPUB 常见的"注释体散落、无共享 wrapper"布局（每条 note
+body 是紧跟章节正文的裸 `<p>`），原来的 `container_selector + item_selector`
+完全失效。新增第二种策略：
+
+- `ir_schema.py`：`notes.strategy` 增加 `"container" | "by-ref-target"`，
+  `by-ref-target` 要求 `noterefs.selector`。
+- `ir_engine.py`：新增 `_collect_notes_by_ref()` —— 跟随每个 in-text
+  noteref 的 href 到带该 id 的目标元素，向上爬到最近的 block 祖先当 note
+  body。**用属性精确相等匹配 id**（不是 CSS `#id` 选择器），因此 pandoc
+  里含 `#`/`.` 的非 CSS-safe id 也能解析。
+- 顺手修了 `_rewrite_noterefs`：原来的 href_pattern 正则 `[^"#]+` 把含
+  `#` 的 pandoc id 排除了，导致 noteref 改写后 0 命中。改为用
+  `note_id_map` 成员判定（在映射里就改写），去掉脆弱的正则门。
+- `prompts.py`：IR_SYSTEM 增加 by-ref-target 的使用指引（pandoc EPUB
+  优先用它；noterefs.selector 必须只匹配正文里的引用锚，不能匹配 note
+  body 内部的回跳锚，否则正文段会被误当注释）。
+
+修完后在《可能性的艺术》上本地验证：33 注释 / 33 noteref / 0 orphan，对了。
+
+## 17. 架构转向：能枚举的分支用程序，语义判断才交给 AI
+
+用户提出核心思路（原话）：
+
+> "能用程序精确实现的尽可能用程序……分支有确定个数枚举就用程序，
+> 需要 AI 判断的用 AI。"
+
+落到 step2 上的拆分：
+
+- **程序确定性做的**（分支有限、可枚举、机械）：
+  - 骨架组装（html/head/meta/title/body/main#book/bodymatter/notes）
+  - 标题树的**层级嵌套**（用栈：碰到 level L 就 pop 掉栈顶 level≥L 的，
+    depth=栈深+1，depth==1 → chapter+h1，否则 section+h{depth}）
+  - **注释配对**（利用脚注双向不变量：正文 `<a href="#X">` ↔ 注释体内
+    `<a id="X" href="#refid">`，按 id 精确配对，note body = 其锚点为
+    block 内首元素的那个 block）
+- **只交给 AI 的**（非枚举、语义）：每个标题在书名之下的**逻辑层级**，
+  以及 skip（重复书名）/ merge（被拆断的标题续行）。
+
+这就是 **plan_7（program-first + AI labels）**。
+
+## 18. 方案 7 的关键设计决策：AI 只输出 "level X"，不输出"篇/章/节"
+
+中间版本让 AI 按 heading **签名**（tag+class）打标，结果在《置身事内》翻车：
+
+- `篇`（class=parttitle-c）的 level 排到了 `章` 下面
+- 同一个签名 `prefacetitle-c` 横跨多个角色（前言 / 上篇 / 下篇标题）
+
+→ 说明**按签名打标根本不成立**：同一个 class 在书里可以是不同层级。
+
+用户明确最终诉求（原话）：
+
+> "我要的最终效果是：书名下面的第一层级就是 h1，第二层级就是 h2，
+> 而不是局限在'篇''章'这种东西里。"
+> "不要让 AI 输出是篇还是章，让 AI 输出 level x 就好了。"
+
+**改为 Option A（按每个标题出现位置逐个打 level）**：
+
+- 给 AI 的签名表（`_outline`）现在是按文档顺序的逐行清单，每行带
+  `{i, tag, class, text[:60]}`，并**附上该标题所在的源码行号**
+  （bs4 `sourceline`，应用户要求加入）。
+- AI 返回 `{"document":{title,language}, "headings":[
+  {"i":idx,"level":int} | {"i":idx,"skip":true} | {"i":idx,"merge":true}]}`。
+  - level 1 = 书名直接下级；更深 = 父级 level + 1；不允许层级跳跃 >1。
+  - skip = 丢弃重复的书名标题；merge = 与前一标题合并成完整标题（如
+    被拆断的「第一章 / 全球视野」）。
+  - 同一个 class 可以是不同 level；收尾性章节（结束语、参考文献）回到
+    level 1。
+- 程序按文档顺序索引 `{id(h): i}` 对齐 AI 决策，再用上面的栈算法把
+  level 序列翻译成 h1>h2>h3>h4 的真实嵌套。
+
+### merge 方向 bug
+
+第一版 merge 把标题**向后**贴到了**前一个**标题上 —— 但「第一章」在前、
+「全球视野」在后，结果「全球视野」漏给了上一节。改为**向前 merge**
+（pending_prefix 前缀到下一个开启的 section），验证得到「第一章 全球视野」。
+
+## 19. 方案 7 在两本书上的结果
+
+| 书 | 耗时 | tokens | 顶层(h1) | sections | note/noteref | orphan | jump | 状态 |
+|----|----:|-------:|--------:|---------:|:------------:|-------:|-----:|------|
+| 可能性的艺术 | 38.5s | 11.1k | 8 | 147 | 33 / 33 | 0 | 0 | PASS |
+| 置身事内 | 36.4s | 7.2k | 6 | 106 | 311 / 311 | 0 | 0 | PASS |
+
+层级完全符合预期：
+
+- **可能性的艺术**顶层 8 项：序言、（重复书名一项被识别）、第一~五章、
+  参考书目；每章下的「节」正确降到 h2/h3，split-title「第一章 全球视野」
+  合并成功。
+- **置身事内**顶层 6 项：目录、前言、上篇、下篇、结束语、参考文献；
+  第一~八章作为 h2 挂在所属「篇」下，「节」h3、「小标题」h4，
+  结束语/参考文献正确 pop 回 h1。与用户截图里的目标目录逐项一致。
+
+token 成本（7-11k）和耗时（~37s）都在可接受范围，且**注释 0 orphan 是程序
+保证的**（不依赖 AI 的 selector），比 IR 路线稳得多。
+
+## 20. 本轮结论
+
+1. **plan_7 是目前最稳的方案**：把"会塌方"的部分（章节切分、注释配对）
+   全部交给确定性程序，AI 只回答它真正擅长且无法枚举的问题（每个标题的
+   逻辑层级 + skip/merge）。两本结构差异很大的书都拿到正确层级 + 0 orphan。
+2. **"AI 输出 level 而非语义标签（篇/章）"是关键**：避免了同一 class 跨
+   角色、以及把书特定词汇焊进逻辑的问题，泛化性明显更好。
+3. IR 反查方案（by-ref-target）让 plan_4-6 的注释能跑通，但章节切分的根本
+   缺陷仍在，IR 路线整体仍不如 plan_7。
+
+## 21. 仍然 open 的问题（本轮新增）
+
+1. plan_7 只在 2 本书上验证过，n 仍然太小 —— 需要更大、结构更杂的测试集
+   （目录树深度 >4、混合 part/chapter/无 part 的书、纯散文集等）。
+2. evaluator 偏松：不校验骨架完整性、不查层级 sanity、不查空注释，会把
+   结构性损坏的输出判 PASS。需要补 skeleton + hierarchy + non-empty-note
+   三类断言。
+3. plan_7 依赖 bs4 `sourceline`，若上游 HTML 经过重排可能行号失真 —— 待
+   确认行号信息对 AI 判断的实际增益有多大。
+4. 选定 plan_7 为主路线后，回写到 Rust pipeline 的工作量评估（栈算法 +
+   注释配对在 Rust 侧重写 vs 调 Python）。
