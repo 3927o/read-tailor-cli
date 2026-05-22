@@ -2,12 +2,13 @@
 """Plan 7: program-first normalization.
 
 Philosophy: the PROGRAM does everything mechanical and deterministic
-(document skeleton, heading-tree nesting with continuous level remapping,
-note pairing via the bidirectional noteref<->note link invariant). The AI
-is asked ONLY the small semantic question it cannot decide mechanically:
-what role does each heading *signature* play — front-matter / back-matter /
-body heading at logical level N / title-continuation / skip. The AI returns
-a tiny JSON of labels; it never writes CSS selectors, code, or content.
+(document skeleton, heading-tree nesting from per-heading levels, note
+pairing via the bidirectional noteref<->note link invariant). The AI is
+asked ONLY the semantic question it cannot decide mechanically: for each
+heading (in document order) what is its logical LEVEL in the final table
+of contents — 1 = a direct child of the book, 2 = nested under a level-1,
+and so on. The AI returns pure levels (plus skip / merge); it never writes
+CSS selectors, code, or content, and never names a level "part"/"chapter".
 
 Self-contained: does not import or modify the IR engine used by plans 4-6,
 so the existing plans are unaffected.
@@ -36,81 +37,83 @@ HEADINGS = ["h1", "h2", "h3", "h4", "h5", "h6"]
 BLOCK_TAGS = {"p", "div", "li", "section", "blockquote", "aside", "td", "figure"}
 
 SYSTEM = """\
-You are a book-structure SEMANTIC LABELER. A deterministic program has
-already parsed the raw HTML and extracted every distinct heading
-"signature" (tag + class) together with its occurrence count and a few
-sample texts.
+You assign a logical OUTLINE LEVEL to every heading of a book. A
+deterministic program has already parsed the raw HTML and extracted the
+headings in document order; for each it gives an index, its tag+class, and
+its text. You decide the nesting; the program then builds the normalized
+HTML and the table of contents from your levels.
 
-Your ONLY job is to assign a semantic role to each signature. You do NOT
-write CSS selectors, code, ids, or content. Return ONE JSON object:
+Return ONE JSON object:
 
 {
   "document": { "title": "string", "language": "BCP-47 code or null" },
-  "labels": [
-    { "signature": "<copied verbatim>", "role": "...", "level": <int> }
+  "headings": [
+    { "i": <index, copied verbatim>, "level": <int >= 1> },
+    { "i": <index>, "skip": true },
+    { "i": <index>, "merge": true }
   ]
 }
 
-Allowed roles:
-- "body"  : a real body-structure heading. MUST include "level":
-            1 = top reading unit (becomes a chapter);
-            2, 3, ... = nested sub-sections (deeper level = larger number).
-- "front" : a front-matter heading (preface / foreword / intro before the
-            main body).
-- "back"  : a back-matter heading (bibliography / appendix / postscript).
-- "merge" : this heading is a CONTINUATION of the immediately preceding
-            heading's title and should be merged into it. Use for titles
-            split across two adjacent headings (e.g. "Chapter 1" followed
-            by the chapter name on a separate heading).
-- "skip"  : drop this heading (e.g. a heading that merely repeats the
-            whole-book title).
+Meaning of level (think of the final collapsible TOC):
+- level 1 = a DIRECT child of the book (top of the outline). Preface,
+  introduction, each top-level division, postscript, bibliography, etc.
+  are usually all level 1.
+- level 2 = nested one step under a level-1 heading.
+- level 3 = nested under a level-2 heading, and so on.
+  A heading that reads as being INSIDE another (a chapter inside a part, a
+  section inside a chapter) gets parent_level + 1.
+
+Special actions instead of a level:
+- "skip": true  -> drop this heading (e.g. one that merely repeats the
+  whole-book title).
+- "merge": true -> this heading is only the CONTINUATION of the
+  IMMEDIATELY PRECEDING heading's title (a title split across two adjacent
+  headings, e.g. "Chapter 1" then its name). Its text is merged into that
+  previous heading; do not also give it a level.
 
 Rules:
-- Decide "level" from the LOGICAL reading hierarchy implied by the counts
-  and sample texts, NOT from the raw tag number. The chapter level is the
-  top reading unit; it is frequently NOT the most common heading (the most
-  common one is usually the deepest sub-section).
-- Each signature includes "lines": the source line numbers (in document
-  order) where its headings occur. Use them to infer RELATIVE level by
-  containment: if one signature's occurrences BRACKET many occurrences of
-  another (its line range spans across them), the bracketing one is a
-  HIGHER level (smaller "level" number). For example, a "part" heading
-  whose two occurrences enclose several chapter headings sits ABOVE those
-  chapters and must get a SMALLER level number than them. Never give a
-  bracketing heading a larger level number than the headings it encloses.
-- Copy each "signature" string verbatim from the input.
+- Give a decision for EVERY index from 0 to N-1. Copy "i" verbatim.
+- Decide nesting from reading logic + document order + the texts/classes.
+  Same class OFTEN means same level, but NOT always: the same class can
+  appear at different depths (e.g. a "preface" and a "chapter" sharing one
+  class — the preface is level 1, a chapter sitting under a part is
+  level 2). A concluding section (postscript / appendix / bibliography)
+  returns to level 1 even if it shares a class with the chapters.
+- A heading that, by position, encloses several following headings is
+  their parent: give it a SMALLER level than the headings it encloses.
+- Never let levels jump by more than 1 when going deeper (1 -> 2 -> 3,
+  never 1 -> 3).
 - Output ONLY the JSON object, no commentary.
 """
 
 
-def _signatures(body: Tag) -> list[dict]:
-    out: list[dict] = []
-    index: dict[str, dict] = {}
-    for h in body.find_all(HEADINGS):
+def _outline(body: Tag) -> tuple[list[dict], list[Tag]]:
+    """Headings in document order: a compact list for the AI plus the
+    parallel list of Tag objects (same order) for index alignment."""
+    rows: list[dict] = []
+    tags: list[Tag] = []
+    for i, h in enumerate(body.find_all(HEADINGS)):
         cls = " ".join(h.get("class") or [])
-        sig = f"{h.name}|{cls}"
-        entry = index.get(sig)
-        if entry is None:
-            entry = {"signature": sig, "count": 0, "lines": [], "samples": []}
-            index[sig] = entry
-            out.append(entry)
-        entry["count"] += 1
-        if h.sourceline is not None:
-            entry["lines"].append(h.sourceline)
-        txt = h.get_text(strip=True)
-        if txt and len(entry["samples"]) < 6:
-            entry["samples"].append(txt[:40])
-    return out
+        rows.append(
+            {
+                "i": i,
+                "tag": h.name,
+                "class": cls,
+                "text": h.get_text(strip=True)[:60],
+            }
+        )
+        tags.append(h)
+    return rows, tags
 
 
-def _user_prompt(sigs: list[dict], title_guess: str) -> str:
+def _user_prompt(rows: list[dict], title_guess: str) -> str:
     payload = json.dumps(
-        {"title_guess": title_guess, "heading_signatures": sigs},
+        {"title_guess": title_guess, "headings": rows},
         ensure_ascii=False,
         indent=2,
     )
     return (
-        "Label the following heading signatures extracted by the program.\n\n"
+        "Assign an outline level to every heading below (document order).\n\n"
         f"{payload}\n"
     )
 
@@ -207,25 +210,17 @@ def _clone(out: BeautifulSoup, node: Tag) -> Tag:
     return new
 
 
-def build_normalized(raw_html: str, labels: list[dict], doc_meta: dict) -> str:
+def build_normalized(raw_html: str, decisions: dict[int, dict], doc_meta: dict) -> str:
     src = BeautifulSoup(raw_html, "html.parser")
     body = src.find("body")
     if body is None:
         raise RuntimeError("raw HTML has no <body>")
 
-    role_of: dict[str, str] = {}
-    level_of: dict[str, int] = {}
-    for item in labels or []:
-        sig = item.get("signature")
-        if not sig:
-            continue
-        role = item.get("role") or "body"
-        role_of[sig] = role
-        if role == "body":
-            try:
-                level_of[sig] = max(1, int(item.get("level") or 1))
-            except (TypeError, ValueError):
-                level_of[sig] = 1
+    # Align decisions to headings by document-order index (same enumeration
+    # the prompt used).
+    head_index: dict[int, int] = {
+        id(h): i for i, h in enumerate(body.find_all(HEADINGS))
+    }
 
     # --- notes (deterministic) ---
     note_blocks, note_anchor_id_by_block = detect_note_pairs(body)
@@ -278,27 +273,13 @@ def build_normalized(raw_html: str, labels: list[dict], doc_meta: dict) -> str:
     html.append(obody)
     out.append(html)
 
-    regions: dict[str, Tag] = {}
+    bodymatter = out.new_tag("section", id="bodymatter")
+    bodymatter.attrs["data-role"] = "bodymatter"
+    main.append(bodymatter)
 
-    def region_root(name: str) -> Tag:
-        if name not in regions:
-            if name == "body":
-                sec = out.new_tag("section", id="bodymatter")
-                sec.attrs["data-role"] = "bodymatter"
-            elif name == "front":
-                sec = out.new_tag("section", id="frontmatter")
-                sec.attrs["data-role"] = "frontmatter"
-            else:
-                sec = out.new_tag("section", id="backmatter")
-                sec.attrs["data-role"] = "backmatter"
-            regions[name] = sec
-            main.append(sec)
-        return regions[name]
-
-    region: str | None = None
-    stack: list[dict] = []
+    stack: list[dict] = []  # {'level': ai_level, 'section': tag, 'heading': tag}
     chap_counter = [0]
-    pending_prefix: list[str] = []  # "merge" headings waiting to prefix the next title
+    pending_prefix: list[str] = []
 
     def open_section(ai_level: int, title_text: str) -> None:
         if pending_prefix:
@@ -307,9 +288,9 @@ def build_normalized(raw_html: str, labels: list[dict], doc_meta: dict) -> str:
         while stack and stack[-1]["level"] >= ai_level:
             stack.pop()
         depth = len(stack) + 1
-        parent = stack[-1]["section"] if stack else region_root(region or "front")
+        parent = stack[-1]["section"] if stack else bodymatter
         sec = out.new_tag("section")
-        if depth == 1 and region == "body":
+        if depth == 1:
             chap_counter[0] += 1
             sec.attrs["class"] = "chapter"
             sec.attrs["data-type"] = "chapter"
@@ -324,7 +305,7 @@ def build_normalized(raw_html: str, labels: list[dict], doc_meta: dict) -> str:
         stack.append({"level": ai_level, "section": sec, "heading": heading})
 
     def attach_content(node: Tag) -> None:
-        target = stack[-1]["section"] if stack else region_root(region or "front")
+        target = stack[-1]["section"] if stack else bodymatter
         target.append(_clone(out, node))
 
     for block in list(body.children):
@@ -333,49 +314,21 @@ def build_normalized(raw_html: str, labels: list[dict], doc_meta: dict) -> str:
         if id(block) in in_note or block.name == "hr":
             continue
         if block.name in HEADINGS:
-            cls = " ".join(block.get("class") or [])
-            sig = f"{block.name}|{cls}"
-            role = role_of.get(sig, "body")
+            idx = head_index.get(id(block))
+            decision = decisions.get(idx, {}) if idx is not None else {}
             text = block.get_text(strip=True)
-            if role == "skip":
+            if decision.get("skip"):
                 continue
-            if role == "merge":
+            if decision.get("merge"):
                 pending_prefix.append(text)
                 continue
-            if role == "front":
-                if region != "front":
-                    region = "front"
-                    stack.clear()
-                open_section(1, text)
-                continue
-            if role == "back":
-                if region != "back":
-                    region = "back"
-                    stack.clear()
-                open_section(1, text)
-                continue
-            # role == "body"
-            level = level_of.get(sig, int(block.name[1]))
-            if level <= 1:
-                if region != "body":
-                    region = "body"
-                    stack.clear()
-                open_section(1, text)
-            else:
-                if region is None:
-                    region = "front"
-                open_section(level, text)
+            try:
+                level = max(1, int(decision.get("level") or 1))
+            except (TypeError, ValueError):
+                level = 1
+            open_section(level, text)
             continue
-        # content block
-        if region is None:
-            region = "front"
         attach_content(block)
-
-    # Ensure bodymatter exists and regions are ordered front, body, back.
-    region_root("body")
-    for name in ("front", "body", "back"):
-        if name in regions:
-            main.append(regions[name])
 
     if note_blocks:
         notes_sec = out.new_tag("section", id="book-notes")
@@ -403,11 +356,11 @@ def run(raw_html_path: str, output_html_path: str, output_structure_path: str) -
     if body is None:
         raise RuntimeError("raw HTML has no <body>")
 
-    sigs = _signatures(body)
+    rows, _tags = _outline(body)
     title_node = src.find("title")
     title_guess = title_node.get_text(strip=True) if title_node else ""
 
-    user = _user_prompt(sigs, title_guess)
+    user = _user_prompt(rows, title_guess)
     response, tokens = call_ai(user, SYSTEM, max_tokens=8000)
     write_trace(
         output_html_path,
@@ -416,12 +369,18 @@ def run(raw_html_path: str, output_html_path: str, output_structure_path: str) -
     )
 
     parsed = parse_ir_response(response)
-    labels = parsed.get("labels") or []
+    decisions: dict[int, dict] = {}
+    for item in parsed.get("headings") or []:
+        if isinstance(item, dict) and "i" in item:
+            try:
+                decisions[int(item["i"])] = item
+            except (TypeError, ValueError):
+                continue
     doc_meta = parsed.get("document") or {}
     if not doc_meta.get("title"):
         doc_meta["title"] = title_guess or "Untitled"
 
-    normalized = build_normalized(raw, labels, doc_meta)
+    normalized = build_normalized(raw, decisions, doc_meta)
     write_normalized(output_html_path, normalized)
     write_structure_json(output_html_path, output_structure_path)
     return tokens
