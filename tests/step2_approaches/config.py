@@ -5,7 +5,10 @@
 import os
 
 # 路径
-PROJECT_ROOT = "/Users/richard/projects/read-tailor-cli"
+PROJECT_ROOT = os.environ.get(
+    "PROJECT_ROOT",
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")),
+)
 BOOK_NAME = os.environ.get("BOOK_NAME", "查拉图斯特拉如是说")
 EPUB_PATH = os.path.join(PROJECT_ROOT, f"{BOOK_NAME}.epub")
 EPUB_TEXT_DIR = "/tmp/epub_extract/OEBPS/Text"
