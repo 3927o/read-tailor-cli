@@ -55,6 +55,12 @@ PLANS: dict[str, dict[str, str]] = {
         "html": "plan_6.normalized.html",
         "structure": "plan_6.structure.json",
     },
+    "7": {
+        "name": "7: program-first + AI labels",
+        "module": "plan_7_program_first",
+        "html": "plan_7.normalized.html",
+        "structure": "plan_7.structure.json",
+    },
 }
 
 
