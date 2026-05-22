@@ -1,0 +1,1282 @@
+## SYSTEM
+You assign a logical OUTLINE LEVEL to every heading of a book. A
+deterministic program has already parsed the raw HTML and extracted the
+headings in document order; for each it gives an index, its tag+class, and
+its text. You decide the nesting; the program then builds the normalized
+HTML and the table of contents from your levels.
+
+Return ONE JSON object:
+
+{
+  "document": { "title": "string", "language": "BCP-47 code or null" },
+  "headings": [
+    { "i": <index, copied verbatim>, "level": <int >= 1> },
+    { "i": <index>, "skip": true },
+    { "i": <index>, "merge": true }
+  ]
+}
+
+Meaning of level (think of the final collapsible TOC):
+- level 1 = a DIRECT child of the book (top of the outline). Preface,
+  introduction, each top-level division, postscript, bibliography, etc.
+  are usually all level 1.
+- level 2 = nested one step under a level-1 heading.
+- level 3 = nested under a level-2 heading, and so on.
+  A heading that reads as being INSIDE another (a chapter inside a part, a
+  section inside a chapter) gets parent_level + 1.
+
+Special actions instead of a level:
+- "skip": true  -> drop this heading (e.g. one that merely repeats the
+  whole-book title).
+- "merge": true -> this heading is only the CONTINUATION of the
+  IMMEDIATELY PRECEDING heading's title (a title split across two adjacent
+  headings, e.g. "Chapter 1" then its name). Its text is merged into that
+  previous heading; do not also give it a level.
+
+Rules:
+- Give a decision for EVERY index from 0 to N-1. Copy "i" verbatim.
+- Decide nesting from reading logic + document order + the texts/classes.
+  Same class OFTEN means same level, but NOT always: the same class can
+  appear at different depths (e.g. a "preface" and a "chapter" sharing one
+  class — the preface is level 1, a chapter sitting under a part is
+  level 2). A concluding section (postscript / appendix / bibliography)
+  returns to level 1 even if it shares a class with the chapters.
+- A heading that, by position, encloses several following headings is
+  their parent: give it a SMALLER level than the headings it encloses.
+- Never let levels jump by more than 1 when going deeper (1 -> 2 -> 3,
+  never 1 -> 3).
+- Output ONLY the JSON object, no commentary.
+
+
+## USER
+Assign an outline level to every heading below (document order).
+
+{
+  "title_guess": "查拉图斯特拉如是说",
+  "headings": [
+    {
+      "i": 0,
+      "tag": "h1",
+      "class": "title",
+      "text": "查拉图斯特拉如是说"
+    },
+    {
+      "i": 1,
+      "tag": "h1",
+      "class": "",
+      "text": "扉页"
+    },
+    {
+      "i": 2,
+      "tag": "h1",
+      "class": "c01",
+      "text": "译者前言"
+    },
+    {
+      "i": 3,
+      "tag": "h1",
+      "class": "c02",
+      "text": "查拉图斯特拉如是说"
+    },
+    {
+      "i": 4,
+      "tag": "h2",
+      "class": "c03",
+      "text": "第一部"
+    },
+    {
+      "i": 5,
+      "tag": "h3",
+      "class": "",
+      "text": "查拉图斯特拉的前言"
+    },
+    {
+      "i": 6,
+      "tag": "h4",
+      "class": "sigil_not_in_toc",
+      "text": "1[1]"
+    },
+    {
+      "i": 7,
+      "tag": "h4",
+      "class": "sigil_not_in_toc",
+      "text": "2"
+    },
+    {
+      "i": 8,
+      "tag": "h4",
+      "class": "sigil_not_in_toc",
+      "text": "3"
+    },
+    {
+      "i": 9,
+      "tag": "h4",
+      "class": "sigil_not_in_toc",
+      "text": "4"
+    },
+    {
+      "i": 10,
+      "tag": "h4",
+      "class": "sigil_not_in_toc",
+      "text": "5"
+    },
+    {
+      "i": 11,
+      "tag": "h4",
+      "class": "sigil_not_in_toc",
+      "text": "6"
+    },
+    {
+      "i": 12,
+      "tag": "h4",
+      "class": "sigil_not_in_toc",
+      "text": "7"
+    },
+    {
+      "i": 13,
+      "tag": "h4",
+      "class": "sigil_not_in_toc",
+      "text": "8"
+    },
+    {
+      "i": 14,
+      "tag": "h4",
+      "class": "sigil_not_in_toc",
+      "text": "9"
+    },
+    {
+      "i": 15,
+      "tag": "h4",
+      "class": "sigil_not_in_toc",
+      "text": "10"
+    },
+    {
+      "i": 16,
+      "tag": "h3",
+      "class": "",
+      "text": "查拉图斯特拉的说教"
+    },
+    {
+      "i": 17,
+      "tag": "h4",
+      "class": "",
+      "text": "三段变化"
+    },
+    {
+      "i": 18,
+      "tag": "h4",
+      "class": "",
+      "text": "道德的讲座"
+    },
+    {
+      "i": 19,
+      "tag": "h4",
+      "class": "",
+      "text": "背后世界论者[74]"
+    },
+    {
+      "i": 20,
+      "tag": "h4",
+      "class": "",
+      "text": "轻视肉体者[94]"
+    },
+    {
+      "i": 21,
+      "tag": "h4",
+      "class": "",
+      "text": "快乐的热情和痛苦的热情[104]"
+    },
+    {
+      "i": 22,
+      "tag": "h4",
+      "class": "",
+      "text": "苍白的犯罪者"
+    },
+    {
+      "i": 23,
+      "tag": "h4",
+      "class": "",
+      "text": "读和写"
+    },
+    {
+      "i": 24,
+      "tag": "h4",
+      "class": "",
+      "text": "山上的树[130]"
+    },
+    {
+      "i": 25,
+      "tag": "h4",
+      "class": "",
+      "text": "死亡的说教者[137]"
+    },
+    {
+      "i": 26,
+      "tag": "h4",
+      "class": "",
+      "text": "战斗与战士[145]"
+    },
+    {
+      "i": 27,
+      "tag": "h4",
+      "class": "",
+      "text": "新的偶像"
+    },
+    {
+      "i": 28,
+      "tag": "h4",
+      "class": "",
+      "text": "市场的苍蝇"
+    },
+    {
+      "i": 29,
+      "tag": "h4",
+      "class": "",
+      "text": "贞洁[172]"
+    },
+    {
+      "i": 30,
+      "tag": "h4",
+      "class": "",
+      "text": "朋友"
+    },
+    {
+      "i": 31,
+      "tag": "h4",
+      "class": "",
+      "text": "一千个目标和一个目标"
+    },
+    {
+      "i": 32,
+      "tag": "h4",
+      "class": "",
+      "text": "爱邻[204]"
+    },
+    {
+      "i": 33,
+      "tag": "h4",
+      "class": "",
+      "text": "创造者的道路"
+    },
+    {
+      "i": 34,
+      "tag": "h4",
+      "class": "",
+      "text": "年老的和年轻的女人"
+    },
+    {
+      "i": 35,
+      "tag": "h4",
+      "class": "",
+      "text": "毒蛇的咬伤"
+    },
+    {
+      "i": 36,
+      "tag": "h4",
+      "class": "",
+      "text": "孩子和结婚[241]"
+    },
+    {
+      "i": 37,
+      "tag": "h4",
+      "class": "",
+      "text": "自愿的死"
+    },
+    {
+      "i": 38,
+      "tag": "h4",
+      "class": "",
+      "text": "赠予的道德[260]"
+    },
+    {
+      "i": 39,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "1"
+    },
+    {
+      "i": 40,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "2"
+    },
+    {
+      "i": 41,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "3"
+    },
+    {
+      "i": 42,
+      "tag": "h2",
+      "class": "c04",
+      "text": "第二部"
+    },
+    {
+      "i": 43,
+      "tag": "h4",
+      "class": "",
+      "text": "拿着镜子的小孩"
+    },
+    {
+      "i": 44,
+      "tag": "h4",
+      "class": "",
+      "text": "在幸福的岛屿上[295]"
+    },
+    {
+      "i": 45,
+      "tag": "h4",
+      "class": "",
+      "text": "同情者[308]"
+    },
+    {
+      "i": 46,
+      "tag": "h4",
+      "class": "",
+      "text": "教士们[313]"
+    },
+    {
+      "i": 47,
+      "tag": "h4",
+      "class": "",
+      "text": "有道德的人"
+    },
+    {
+      "i": 48,
+      "tag": "h4",
+      "class": "",
+      "text": "贱民"
+    },
+    {
+      "i": 49,
+      "tag": "h4",
+      "class": "",
+      "text": "塔兰图拉毒蛛[353]"
+    },
+    {
+      "i": 50,
+      "tag": "h4",
+      "class": "",
+      "text": "著名的哲人[366]"
+    },
+    {
+      "i": 51,
+      "tag": "h4",
+      "class": "",
+      "text": "夜歌[386]"
+    },
+    {
+      "i": 52,
+      "tag": "h4",
+      "class": "",
+      "text": "舞蹈之歌"
+    },
+    {
+      "i": 53,
+      "tag": "h4",
+      "class": "",
+      "text": "坟墓之歌[404]"
+    },
+    {
+      "i": 54,
+      "tag": "h4",
+      "class": "",
+      "text": "超越自己[420]"
+    },
+    {
+      "i": 55,
+      "tag": "h4",
+      "class": "",
+      "text": "崇高的人们[437]"
+    },
+    {
+      "i": 56,
+      "tag": "h4",
+      "class": "",
+      "text": "文化之国"
+    },
+    {
+      "i": 57,
+      "tag": "h4",
+      "class": "",
+      "text": "无玷的认识"
+    },
+    {
+      "i": 58,
+      "tag": "h4",
+      "class": "",
+      "text": "学者[471]"
+    },
+    {
+      "i": 59,
+      "tag": "h4",
+      "class": "",
+      "text": "诗人"
+    },
+    {
+      "i": 60,
+      "tag": "h4",
+      "class": "",
+      "text": "重大的事件[507]"
+    },
+    {
+      "i": 61,
+      "tag": "h4",
+      "class": "",
+      "text": "预言者[521]"
+    },
+    {
+      "i": 62,
+      "tag": "h4",
+      "class": "",
+      "text": "拯救"
+    },
+    {
+      "i": 63,
+      "tag": "h4",
+      "class": "",
+      "text": "处世之道"
+    },
+    {
+      "i": 64,
+      "tag": "h4",
+      "class": "",
+      "text": "最寂静的时刻[573]"
+    },
+    {
+      "i": 65,
+      "tag": "h2",
+      "class": "c04",
+      "text": "第三部"
+    },
+    {
+      "i": 66,
+      "tag": "h4",
+      "class": "",
+      "text": "浪游者[588]"
+    },
+    {
+      "i": 67,
+      "tag": "h4",
+      "class": "",
+      "text": "幻影和谜[608]"
+    },
+    {
+      "i": 68,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "1"
+    },
+    {
+      "i": 69,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "2"
+    },
+    {
+      "i": 70,
+      "tag": "h4",
+      "class": "",
+      "text": "违背意愿的幸福[634]"
+    },
+    {
+      "i": 71,
+      "tag": "h4",
+      "class": "",
+      "text": "日出之前[651]"
+    },
+    {
+      "i": 72,
+      "tag": "h4",
+      "class": "",
+      "text": "变小的道德[674]"
+    },
+    {
+      "i": 73,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "1"
+    },
+    {
+      "i": 74,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "2"
+    },
+    {
+      "i": 75,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "3"
+    },
+    {
+      "i": 76,
+      "tag": "h4",
+      "class": "",
+      "text": "在橄榄山上[703]"
+    },
+    {
+      "i": 77,
+      "tag": "h4",
+      "class": "",
+      "text": "走开[717]"
+    },
+    {
+      "i": 78,
+      "tag": "h4",
+      "class": "",
+      "text": "背教者[732]"
+    },
+    {
+      "i": 79,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "1"
+    },
+    {
+      "i": 80,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "2"
+    },
+    {
+      "i": 81,
+      "tag": "h4",
+      "class": "",
+      "text": "还乡[747]"
+    },
+    {
+      "i": 82,
+      "tag": "h4",
+      "class": "",
+      "text": "三件恶行[761]"
+    },
+    {
+      "i": 83,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "1"
+    },
+    {
+      "i": 84,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "2"
+    },
+    {
+      "i": 85,
+      "tag": "h4",
+      "class": "",
+      "text": "重压之魔[786]"
+    },
+    {
+      "i": 86,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "1"
+    },
+    {
+      "i": 87,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "2"
+    },
+    {
+      "i": 88,
+      "tag": "h4",
+      "class": "",
+      "text": "古老的法版和新的法版[802]"
+    },
+    {
+      "i": 89,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "1"
+    },
+    {
+      "i": 90,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "2"
+    },
+    {
+      "i": 91,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "3"
+    },
+    {
+      "i": 92,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "4"
+    },
+    {
+      "i": 93,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "5"
+    },
+    {
+      "i": 94,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "6"
+    },
+    {
+      "i": 95,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "7"
+    },
+    {
+      "i": 96,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "8"
+    },
+    {
+      "i": 97,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "9"
+    },
+    {
+      "i": 98,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "10"
+    },
+    {
+      "i": 99,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "11"
+    },
+    {
+      "i": 100,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "12"
+    },
+    {
+      "i": 101,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "13"
+    },
+    {
+      "i": 102,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "14"
+    },
+    {
+      "i": 103,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "15"
+    },
+    {
+      "i": 104,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "16"
+    },
+    {
+      "i": 105,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "17"
+    },
+    {
+      "i": 106,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "18"
+    },
+    {
+      "i": 107,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "19"
+    },
+    {
+      "i": 108,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "20"
+    },
+    {
+      "i": 109,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "21"
+    },
+    {
+      "i": 110,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "22"
+    },
+    {
+      "i": 111,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "23"
+    },
+    {
+      "i": 112,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "24"
+    },
+    {
+      "i": 113,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "25"
+    },
+    {
+      "i": 114,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "26"
+    },
+    {
+      "i": 115,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "27"
+    },
+    {
+      "i": 116,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "28"
+    },
+    {
+      "i": 117,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "29"
+    },
+    {
+      "i": 118,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "30[920]"
+    },
+    {
+      "i": 119,
+      "tag": "h4",
+      "class": "",
+      "text": "康复者[926]"
+    },
+    {
+      "i": 120,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "1"
+    },
+    {
+      "i": 121,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "2"
+    },
+    {
+      "i": 122,
+      "tag": "h4",
+      "class": "",
+      "text": "伟大的渴望[948]"
+    },
+    {
+      "i": 123,
+      "tag": "h4",
+      "class": "",
+      "text": "另一曲舞蹈之歌[969]"
+    },
+    {
+      "i": 124,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "1"
+    },
+    {
+      "i": 125,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "2"
+    },
+    {
+      "i": 126,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "3[990]"
+    },
+    {
+      "i": 127,
+      "tag": "h4",
+      "class": "",
+      "text": "七个印[994]（或：同意和阿门之歌）"
+    },
+    {
+      "i": 128,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "1"
+    },
+    {
+      "i": 129,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "2"
+    },
+    {
+      "i": 130,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "3"
+    },
+    {
+      "i": 131,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "4"
+    },
+    {
+      "i": 132,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "5"
+    },
+    {
+      "i": 133,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "6"
+    },
+    {
+      "i": 134,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "7"
+    },
+    {
+      "i": 135,
+      "tag": "h2",
+      "class": "c04",
+      "text": "第四部*"
+    },
+    {
+      "i": 136,
+      "tag": "h4",
+      "class": "",
+      "text": "蜂蜜供品[1018]"
+    },
+    {
+      "i": 137,
+      "tag": "h4",
+      "class": "",
+      "text": "求救的叫声[1027]"
+    },
+    {
+      "i": 138,
+      "tag": "h4",
+      "class": "",
+      "text": "跟君王们对话[1044]"
+    },
+    {
+      "i": 139,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "1"
+    },
+    {
+      "i": 140,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "2"
+    },
+    {
+      "i": 141,
+      "tag": "h4",
+      "class": "",
+      "text": "蚂蟥[1056]"
+    },
+    {
+      "i": 142,
+      "tag": "h4",
+      "class": "",
+      "text": "魔术师[1070]"
+    },
+    {
+      "i": 143,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "1"
+    },
+    {
+      "i": 144,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "2"
+    },
+    {
+      "i": 145,
+      "tag": "h4",
+      "class": "",
+      "text": "失业[1099]"
+    },
+    {
+      "i": 146,
+      "tag": "h4",
+      "class": "",
+      "text": "极丑的人[1127]"
+    },
+    {
+      "i": 147,
+      "tag": "h4",
+      "class": "",
+      "text": "自愿的乞丐[1146]"
+    },
+    {
+      "i": 148,
+      "tag": "h4",
+      "class": "",
+      "text": "影子[1156]"
+    },
+    {
+      "i": 149,
+      "tag": "h4",
+      "class": "",
+      "text": "正午[1166]"
+    },
+    {
+      "i": 150,
+      "tag": "h4",
+      "class": "",
+      "text": "欢迎会[1177]"
+    },
+    {
+      "i": 151,
+      "tag": "h4",
+      "class": "",
+      "text": "晚餐[1190]"
+    },
+    {
+      "i": 152,
+      "tag": "h4",
+      "class": "",
+      "text": "高人[1198]"
+    },
+    {
+      "i": 153,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "1"
+    },
+    {
+      "i": 154,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "2"
+    },
+    {
+      "i": 155,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "3"
+    },
+    {
+      "i": 156,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "4"
+    },
+    {
+      "i": 157,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "5"
+    },
+    {
+      "i": 158,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "6"
+    },
+    {
+      "i": 159,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "7"
+    },
+    {
+      "i": 160,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "8"
+    },
+    {
+      "i": 161,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "9"
+    },
+    {
+      "i": 162,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "10"
+    },
+    {
+      "i": 163,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "11"
+    },
+    {
+      "i": 164,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "12"
+    },
+    {
+      "i": 165,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "13"
+    },
+    {
+      "i": 166,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "14"
+    },
+    {
+      "i": 167,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "15"
+    },
+    {
+      "i": 168,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "16"
+    },
+    {
+      "i": 169,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "17[1229]"
+    },
+    {
+      "i": 170,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "18"
+    },
+    {
+      "i": 171,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "19"
+    },
+    {
+      "i": 172,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "20"
+    },
+    {
+      "i": 173,
+      "tag": "h4",
+      "class": "",
+      "text": "忧郁之歌[1237]"
+    },
+    {
+      "i": 174,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "1"
+    },
+    {
+      "i": 175,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "2"
+    },
+    {
+      "i": 176,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "3"
+    },
+    {
+      "i": 177,
+      "tag": "h4",
+      "class": "",
+      "text": "学问[1262]"
+    },
+    {
+      "i": 178,
+      "tag": "h4",
+      "class": "",
+      "text": "在沙漠的女儿们中间[1276]"
+    },
+    {
+      "i": 179,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "1"
+    },
+    {
+      "i": 180,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "2[1279]"
+    },
+    {
+      "i": 181,
+      "tag": "h4",
+      "class": "",
+      "text": "觉醒[1299]"
+    },
+    {
+      "i": 182,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "1"
+    },
+    {
+      "i": 183,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "2"
+    },
+    {
+      "i": 184,
+      "tag": "h4",
+      "class": "",
+      "text": "驴子节[1317]"
+    },
+    {
+      "i": 185,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "1"
+    },
+    {
+      "i": 186,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "2"
+    },
+    {
+      "i": 187,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "3"
+    },
+    {
+      "i": 188,
+      "tag": "h4",
+      "class": "",
+      "text": "醉歌[1332]"
+    },
+    {
+      "i": 189,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "1"
+    },
+    {
+      "i": 190,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "2"
+    },
+    {
+      "i": 191,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "3"
+    },
+    {
+      "i": 192,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "4"
+    },
+    {
+      "i": 193,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "5"
+    },
+    {
+      "i": 194,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "6"
+    },
+    {
+      "i": 195,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "7"
+    },
+    {
+      "i": 196,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "8"
+    },
+    {
+      "i": 197,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "9"
+    },
+    {
+      "i": 198,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "10"
+    },
+    {
+      "i": 199,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "11"
+    },
+    {
+      "i": 200,
+      "tag": "h5",
+      "class": "sigil_not_in_toc",
+      "text": "12"
+    },
+    {
+      "i": 201,
+      "tag": "h4",
+      "class": "",
+      "text": "预兆[1374]"
+    },
+    {
+      "i": 202,
+      "tag": "h1",
+      "class": "c01",
+      "text": "注释"
+    },
+    {
+      "i": 203,
+      "tag": "h1",
+      "class": "c01",
+      "text": "译后记"
+    }
+  ]
+}

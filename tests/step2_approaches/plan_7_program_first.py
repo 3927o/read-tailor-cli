@@ -351,7 +351,16 @@ def build_normalized(raw_html: str, decisions: dict[int, dict], doc_meta: dict) 
         for block in list(node.children):
             if not isinstance(block, Tag):
                 continue
-            if id(block) in in_note or block.name == "hr":
+            if id(block) in in_note:
+                continue
+            if block.name == "hr":
+                # Preserve semantic separators (used by collection-style books
+                # to delimit essays). Drop the visual <hr>, emit a structural
+                # marker so downstream consumers can still see the boundary.
+                sep = out.new_tag("div")
+                sep.attrs["data-role"] = "separator"
+                target = stack[-1]["section"] if stack else bodymatter
+                target.append(sep)
                 continue
             if block.name in HEADINGS:
                 idx = head_index.get(id(block))
@@ -408,7 +417,7 @@ def run(raw_html_path: str, output_html_path: str, output_structure_path: str) -
     title_guess = title_node.get_text(strip=True) if title_node else ""
 
     user = _user_prompt(rows, title_guess)
-    response, tokens = call_ai(user, SYSTEM, max_tokens=8000)
+    response, tokens = call_ai(user, SYSTEM, max_tokens=32000)
     write_trace(
         output_html_path,
         f"## SYSTEM\n{SYSTEM}\n\n## USER\n{user}",

@@ -94,7 +94,7 @@ def run_plan(plan_id: str, eval_only: bool = False) -> EvalResult:
         print(f"  完成，耗时 {result.time_seconds:.1f}s")
 
     if os.path.exists(output_html):
-        eval_result = evaluate(output_html, info["name"])
+        eval_result = evaluate(output_html, info["name"], raw_html_path=RAW_HTML)
         result.errors.extend(eval_result.errors)
         result.warnings.extend(eval_result.warnings)
         result.metrics.update(eval_result.metrics)
@@ -111,13 +111,16 @@ def print_comparison(all_results: list[dict]) -> None:
     print(f"\n{'=' * 80}\n  方案对比\n{'=' * 80}")
     header = (
         f"{'方案':<32} {'耗时(s)':>8} {'tokens':>8} {'章节':>5} "
-        f"{'noteref':>8} {'note':>5} {'orphan':>7} {'jump':>5} {'状态':>6}"
+        f"{'noteref':>8} {'note':>5} {'orphan':>7} {'jump':>5} "
+        f"{'字符召回':>9} {'状态':>6}"
     )
     print(header)
     print("-" * len(header))
     for r in all_results:
         m = r.get("metrics", {})
         status = "PASS" if r.get("pass") else "FAIL"
+        recall = m.get("char_recall")
+        recall_str = f"{recall * 100:.1f}%" if isinstance(recall, (int, float)) else "?"
         print(
             f"{r['approach']:<32} "
             f"{r['time_seconds']:>8.1f} "
@@ -127,6 +130,7 @@ def print_comparison(all_results: list[dict]) -> None:
             f"{m.get('note_count', '?'):>5} "
             f"{m.get('noteref_to_note_orphan_count', '?'):>7} "
             f"{m.get('heading_jump_count', '?'):>5} "
+            f"{recall_str:>9} "
             f"{status:>6}"
         )
     print("-" * len(header))

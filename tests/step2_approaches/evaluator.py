@@ -52,7 +52,20 @@ class EvalResult:
         return "\n".join(lines)
 
 
-def evaluate(html_path: str, approach_name: str) -> EvalResult:
+def _visible_text_chars(html: str) -> int:
+    """Total length of the document's visible text. We strip head metadata
+    and any code/style islands first so the count reflects body content the
+    reader actually sees. Two documents with the same value preserve the
+    same text — useful as a content-loss canary."""
+    soup = BeautifulSoup(html, "html.parser")
+    for t in soup(["script", "style", "head"]):
+        t.decompose()
+    return len(" ".join(soup.stripped_strings))
+
+
+def evaluate(
+    html_path: str, approach_name: str, raw_html_path: str | None = None
+) -> EvalResult:
     result = EvalResult(approach=approach_name)
     with open(html_path, "r", encoding="utf-8") as fh:
         html = fh.read()
@@ -163,6 +176,29 @@ def evaluate(html_path: str, approach_name: str) -> EvalResult:
     # ---- 7. TOC (informational) ------------------------------------
     toc = soup.find(attrs={"data-role": "toc"})
     result.metrics["has_toc"] = toc is not None
+
+    # ---- 8. Character recall (only when raw is available) ----------
+    # Compares visible-text character counts between the raw input and the
+    # normalized output. 100% means no text was silently dropped; lower
+    # values flag content loss (whether from over-aggressive note
+    # extraction, missing chapter slicing, etc.).
+    if raw_html_path:
+        try:
+            with open(raw_html_path, "r", encoding="utf-8") as fh:
+                raw_html = fh.read()
+        except FileNotFoundError:
+            result.warnings.append(f"未找到 raw HTML，跳过字符召回检查: {raw_html_path}")
+        else:
+            raw_chars = _visible_text_chars(raw_html)
+            out_chars = _visible_text_chars(html)
+            recall = out_chars / raw_chars if raw_chars else 0.0
+            result.metrics["raw_char_count"] = raw_chars
+            result.metrics["out_char_count"] = out_chars
+            result.metrics["char_recall"] = round(recall, 4)
+            if recall < 0.95:
+                result.warnings.append(
+                    f"字符召回率偏低 ({recall * 100:.1f}%, 丢失 {raw_chars - out_chars} 字)"
+                )
 
     return result
 
