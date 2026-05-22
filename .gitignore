@@ -4,6 +4,9 @@
 *.epub
 .env
 bookcli.toml
+__pycache__/
+/tests/step2_approaches/outputs_*
+/tests/step2_approaches/results_*.json
 
 !.env.example
 !bookcli.toml.example
