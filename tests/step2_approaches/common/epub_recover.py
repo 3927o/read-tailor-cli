@@ -25,9 +25,23 @@ Two independent recoveries, both reading the original EPUB:
    points at, and re-inject the note body — but ONLY for refs that are
    actually dangling, so notes pandoc DID promote are never duplicated.
 
-Only epub:type values "footnote" and "rearnote" are affected by the pandoc
-bug (verified empirically: endnote / note / annotation / sidebar / etc. and
-plain <aside> all survive), so those are the only types we recover.
+   Only epub:type values "footnote" and "rearnote" are affected by this
+   suppression bug (verified empirically: endnote / note / annotation /
+   sidebar / etc. and plain <aside> all survive), so those are the only types
+   we recover.
+
+3. SURVIVING-ID REPAIR  (repair_surviving_ids)
+   A cross-file reference can also break even though pandoc KEEPS the target's
+   content, because pandoc only carries an id on AST nodes that have "Attr":
+     - p / sup / sub / em / strong  -> id is DROPPED (content stays, id gone)
+     - aside (non-suppressed) / table -> id KEPT but NOT file-prefixed, so the
+       rewritten ref "#{file}_{id}" no longer matches the bare "{id}"
+   (See pandoc_id_href_probe.py for the full, version-pinned taxonomy.)
+
+   For each still-dangling ref we trace it back to the EPUB element pandoc
+   kept and re-attach the prefixed id to that SURVIVING content element —
+   never to an empty <span> anchor, because the downstream plan_7 content walk
+   drops empty blocks (only its id, carried on real content, survives).
 """
 from __future__ import annotations
 
@@ -353,16 +367,196 @@ def inject_dropped_notes(epub_path: str, soup: BeautifulSoup) -> list[dict]:
 
 
 # --------------------------------------------------------------------------
+# 3. surviving-id repair (content kept by pandoc, but its id was dropped or
+#    left unprefixed, so a cross-file reference no longer resolves)
+# --------------------------------------------------------------------------
+
+_FILE_BOUNDARY_RE = re.compile(r"\.(?:xhtml|html|htm)$", re.I)
+
+
+def _collapse_ws(text: str) -> str:
+    """Remove ALL whitespace (including the ideographic space U+3000) so a
+    target can be matched by text even after pandoc reflows / re-wraps it."""
+    return re.sub(r"\s+", "", (text or "").replace("　", " "))
+
+
+def _index_epub_ids(epub_path: str) -> dict[str, dict]:
+    """Map pandoc's rewritten id ({basename}_{orig}) -> info for EVERY id-
+    bearing element in the EPUB, so a dangling flattened ref can be traced
+    back to the element pandoc kept (under a different / no id)."""
+    idx: dict[str, dict] = {}
+    with zipfile.ZipFile(epub_path) as zf:
+        for fname, doc in _iter_epub_docs(zf):
+            for el in doc.find_all(id=True):
+                oid = el.get("id")
+                if not oid:
+                    continue
+                key = _rewritten_id(fname, oid)
+                if key in idx:
+                    continue
+                etype = el.get("epub:type") or ""
+                suppressed = etype in SUPPRESSED_NOTE_TYPES
+                idx[key] = {
+                    "file": fname,
+                    "orig_id": oid,
+                    "tag": el.name,
+                    "etype": etype,
+                    "suppressed": suppressed,
+                    # text is only needed to relocate id-dropped targets
+                    "norm_text": ""
+                    if suppressed
+                    else _collapse_ws(el.get_text(" ", strip=True)),
+                }
+    return idx
+
+
+def _is_boundary_span(tag: Tag) -> bool:
+    """pandoc marks each source file's start with an empty
+    <span id="that-file.xhtml">. Recognise it by a filename-like id and the
+    absence of any text."""
+    if tag.name != "span":
+        return False
+    sid = tag.get("id") or ""
+    return bool(_FILE_BOUNDARY_RE.search(sid)) and not tag.get_text(strip=True)
+
+
+def _region_window(
+    tags: list[Tag], boundaries: list[tuple[int, str]], fileid: str
+) -> list[Tag] | None:
+    """The tags (document order) belonging to `fileid`: those between its
+    file-boundary span and the next boundary. None if no boundary matches
+    (so the caller can distinguish "not located" from "not present")."""
+    bidx = None
+    for i, sid in boundaries:
+        if sid and (sid == fileid or sid.startswith(fileid) or fileid.startswith(sid)):
+            bidx = i
+            break
+    if bidx is None:
+        return None
+    nxt = next((i for i, _ in boundaries if i > bidx), len(tags))
+    return tags[bidx + 1 : nxt]
+
+
+def _locate_surviving(
+    window: list[Tag] | None, info: dict
+) -> tuple[Tag | None, str]:
+    """Within a file's region, find pandoc's surviving copy of the EPUB
+    target — by its (unprefixed) original id if that survived (aside / table),
+    else by exact text (p / sup / em … that lost their id)."""
+    if window is None:
+        return None, "no-region"
+    orig = info["orig_id"]
+    for e in window:
+        if e.get("id") == orig:
+            return e, "bare-id"
+    want = info["norm_text"]
+    if want:
+        same_tag = [
+            e
+            for e in window
+            if e.name == info["tag"]
+            and _collapse_ws(e.get_text(" ", strip=True)) == want
+        ]
+        if same_tag:
+            return same_tag[0], "text-tag"
+        any_tag = [
+            e for e in window if _collapse_ws(e.get_text(" ", strip=True)) == want
+        ]
+        if any_tag:
+            return any_tag[0], "text"
+    return None, "unlocatable"
+
+
+def _apply_repair(
+    soup: BeautifulSoup, el: Tag, target_id: str, refs: list[Tag]
+) -> str:
+    """Make `target_id` resolve to `el`. Prefer giving `el` the id directly
+    (it survives plan_7's content walk, which drops empty anchors); only if
+    `el` already carries a still-referenced id do we instead retarget the
+    dangling refs onto that surviving id."""
+    cur = el.get("id")
+    if cur == target_id:
+        return "already-present"
+    if cur is None:
+        el["id"] = target_id
+        el["data-source"] = "epub-id-repair"
+        return "repaired:set-id"
+    referenced = any(
+        (a.get("href") or "").strip() == f"#{cur}"
+        for a in soup.find_all("a", href=True)
+    )
+    if not referenced:
+        el["id"] = target_id
+        el["data-source"] = "epub-id-repair"
+        return "repaired:rename-id"
+    for a in refs:
+        a["href"] = f"#{cur}"
+    return "repaired:retarget-refs"
+
+
+def repair_surviving_ids(epub_path: str, soup: BeautifulSoup) -> list[dict]:
+    """Repair dangling '#'-refs whose EPUB target pandoc KEPT (content present)
+    but under a dropped or unprefixed id. Driven by dangling refs, runs AFTER
+    note injection, and never touches suppressed-note targets.
+    Returns a log of {target, tag, action}."""
+    body = soup.find("body")
+    if body is None:
+        return [{"action": "skipped:no-body"}]
+
+    existing_ids = {el.get("id") for el in soup.find_all(id=True) if el.get("id")}
+    refs_by_target: dict[str, list[Tag]] = {}
+    for a in soup.find_all("a", href=True):
+        href = (a.get("href") or "").strip()
+        if href.startswith("#") and len(href) > 1 and href[1:] not in existing_ids:
+            refs_by_target.setdefault(href[1:], []).append(a)
+    if not refs_by_target:
+        return [{"action": "skipped:no-dangling-refs"}]
+
+    idx = _index_epub_ids(epub_path)
+    tags = [e for e in body.descendants if isinstance(e, Tag)]
+    boundaries = [(i, t.get("id")) for i, t in enumerate(tags) if _is_boundary_span(t)]
+
+    log: list[dict] = []
+    repaired = 0
+    for target in sorted(refs_by_target):
+        info = idx.get(target)
+        if info is None:
+            log.append({"target": target, "action": "skipped:no-epub-target"})
+            continue
+        if info["suppressed"]:
+            log.append({"target": target, "action": "skipped:suppressed-note"})
+            continue
+        window = _region_window(tags, boundaries, info["file"])
+        el, mode = _locate_surviving(window, info)
+        if el is None:
+            log.append(
+                {"target": target, "tag": info["tag"], "action": f"skipped:{mode}"}
+            )
+            continue
+        action = _apply_repair(soup, el, target, refs_by_target[target])
+        if action.startswith("repaired"):
+            existing_ids.add(target)
+            repaired += 1
+        log.append({"target": target, "tag": info["tag"], "action": action})
+
+    log.append(
+        {"action": "summary", "repaired": repaired, "dangling": len(refs_by_target)}
+    )
+    return log
+
+
+# --------------------------------------------------------------------------
 # combined entry point
 # --------------------------------------------------------------------------
 
 
 def recover(epub_path: str, raw_html: str) -> tuple[str, dict]:
-    """Run both recoveries on raw HTML. Returns (augmented_html, log_dict)."""
+    """Run all recoveries on raw HTML. Returns (augmented_html, log_dict)."""
     soup = BeautifulSoup(raw_html, "html.parser")
     title_log = inject_file_titles(epub_path, soup)
     note_log = inject_dropped_notes(epub_path, soup)
-    return str(soup), {"titles": title_log, "notes": note_log}
+    repair_log = repair_surviving_ids(epub_path, soup)
+    return str(soup), {"titles": title_log, "notes": note_log, "repairs": repair_log}
 
 
 # --------------------------------------------------------------------------
@@ -411,6 +605,25 @@ def main(argv: list[str]) -> int:
         print(f"[notes]  {only}")
     if note_injected:
         print(f"  e.g. {note_injected[0]['rewritten_id']} … (+{len(note_injected) - 1} more)")
+
+    repair_summary = next((e for e in log["repairs"] if e.get("action") == "summary"), None)
+    repaired = [
+        e for e in log["repairs"] if str(e.get("action", "")).startswith("repaired")
+    ]
+    if repair_summary:
+        print(
+            f"[repair] fixed {repair_summary['repaired']} "
+            f"(of {repair_summary['dangling']} dangling refs)"
+        )
+    else:
+        only = log["repairs"][0].get("action") if log["repairs"] else "n/a"
+        print(f"[repair] {only}")
+    if repaired:
+        e = repaired[0]
+        print(
+            f"  e.g. {e['target']} <- <{e.get('tag')}> ({e['action']})"
+            f"  (+{len(repaired) - 1} more)"
+        )
     return 0
 
 

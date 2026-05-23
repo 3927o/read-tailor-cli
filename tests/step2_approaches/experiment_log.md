@@ -776,3 +776,53 @@ fixture 影响（无 thead / 无 img）；EPUB2（NCX/class-based）未建模；
    `src/pipeline/steps.rs`。
 4. 源 EPUB 自带缺陷（§27a 的 23 个、双扩展名）大多不可程序恢复，靠坏链指标
    如实暴露即可，不应粉饰。
+
+## 31. 通用链接修复器 repair_surviving_ids（§30-1 落地）
+
+把 §30-1 实现为 `epub_recover` 的第三个恢复器
+`repair_surviving_ids`，处理 §28 里"**内容还在、id 没对上**"的两类断链：
+- **id 被丢**（p/sup/sub/em/strong，AST 无 Attr）—— 内容留着但没了 id；
+- **id 没加前缀**（非 suppressed 的 aside / table，raw 透传）—— 元素带的是裸
+  `{id}`，而引用被改写成 `#{file}_{id}`，对不上。
+
+**先做了实地诊断（先于写码）**：把四本书 pristine pandoc 输出里每个悬空 `#`
+引用，按其 EPUB 目标分类（脚本逻辑同 `inject_dropped_notes` 的 basename 规则）：
+
+| 书 | 悬空数 | 分类 |
+|---|---:|---|
+| 查拉 / 查拉_v2 | 1377 | 全是 suppressed-note（rearnote aside）→ 已由注释恢复器处理 |
+| 毛泽东 | 23 | 全是 source-defect（EPUB 里根本没有该目标）→ 不可恢复 |
+| 悲剧 | 0 | — |
+
+⟹ **真实四本书没有一本触发 §28 的 p/sup 丢 id 或 aside/table 不加前缀**。这两类
+是探针在合成 fixture 上证实的（pandoc 3.9），野外 EPUB 会遇到（指向段落的交叉
+引用、`<sup>` 当锚点、表格锚点），但我们的样本里没有。所以这个修复器**目前唯一
+的验证来自合成测试**，不能靠"在四本书上跑通"来声称它正确。
+
+**关键设计约束（来自 plan_7 源码，不是猜的）**：plan_7 的
+`build_normalized` 内容遍历**会丢弃空块**（`attach_content` 只在
+`block.get_text(strip=True)` 或有媒体时才挂），所以**注入空 `<span id>` 锚点会被
+plan_7 直接吃掉**，修复活不到 evaluator 量测的最终产物。但 `_clone` 保留所有 attr
+（含 id），且非注释引用的 href 原样不动。⟹ **修复必须把 id 附到留存的内容元素
+本身，绝不能用空锚点**：
+- id 被丢（p/sup）：内容元素带文本 → 直接给它 set 上前缀 id；
+- 不加前缀（aside/table）：元素带裸 id → 把裸 id **改名**成前缀 id；
+  若裸 id 仍被别处 `#裸id` 引用（pandoc 后通常不会），则反向**改写悬空引用**指到
+  裸 id，避免破坏既有链接。
+定位用 pandoc 的文件边界锚 `<span id="{basename}">` 划区间，区间内按
+裸 id（case 2）或精确文本+同标签（case 1）匹配；定位不到就 skip 上报，不硬塞。
+
+**合成验证 `test_epub_recover.py`（无 AI / 无网络，24 项全过）**：复用
+`pandoc_id_href_probe` 的 EPUB 构造器，对每个 broken 用例走**全链路**
+`EPUB →pandoc→ raw（悬空）→recover→（解析）→plan_7 build_normalized→（仍解析）`。
+正例：id-dropped p / sup / em、unprefixed table / aside / aside-note。
+负例：cross div（本就好，recover 严格 no-op）、source-defect（目标 EPUB 里不存在，
+**绝不伪造**，诚实保持断链）。`build_normalized(raw, {}, meta)` 可直接调用、不需 AI，
+所以端到端可自动化。
+
+**四本书回归（in-memory，未改任何 live 文件）**：查拉/查拉_v2 注释先恢复
+1377→repair 见 `no-dangling-refs`；毛泽东 23 个全 `skipped:no-epub-target`、
+repaired=0；悲剧 0 悬空。⟹ 对真实书是干净 no-op，符合预期。
+
+**仍不含 TOC**（§30-2 仍 open）：本修复器由悬空 `#` 引用驱动，毛泽东目录是相对
+路径整文件链接、根本不是 `#`，不会被它碰。未提交（等用户确认）。
