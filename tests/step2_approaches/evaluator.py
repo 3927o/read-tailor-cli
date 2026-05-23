@@ -177,24 +177,51 @@ def evaluate(
     toc = soup.find(attrs={"data-role": "toc"})
     result.metrics["has_toc"] = toc is not None
 
-    # ---- 7b. Internal link integrity -------------------------------
-    # How many in-document links (href="#...") point at an id that does not
-    # exist? These render as dead clicks ("无法跳转"). The dominant cause is a
-    # noteref whose note body was dropped upstream (the pandoc rearnote bug),
-    # but it also catches any cross-reference the normalizer fails to wire.
+    # ---- 7b. Link integrity ----------------------------------------
+    # The normalized output is a SINGLE self-contained document, so a link can
+    # only navigate if it is (a) a "#id" anchor whose target id exists, or
+    # (b) a genuine external URL. Everything else is a dead click:
+    #   - "#id" with a missing target  -> e.g. a noteref whose body was
+    #     dropped upstream (pandoc rearnote bug), or a source-broken ref.
+    #   - a relative file path (e.g. "../Text/Volume01.xhtml") -> the EPUB's
+    #     TOC/cross-file links that pandoc left un-rewritten; once flattened
+    #     into one file they point at files that no longer exist.
+    # Counting ONLY "#" links (the previous behaviour) silently missed the
+    # entire TOC, so both kinds are tallied here.
+    external_prefixes = (
+        "http://", "https://", "//", "mailto:", "tel:", "data:", "ftp://"
+    )
     all_ids = {el.get("id") for el in soup.find_all(id=True) if el.get("id")}
-    internal_links = [
-        a
-        for a in soup.find_all(href=True)
-        if (a.get("href") or "").startswith("#") and len(a.get("href")) > 1
-    ]
-    broken_links = [a for a in internal_links if a["href"][1:] not in all_ids]
-    result.metrics["internal_link_count"] = len(internal_links)
-    result.metrics["broken_internal_link_count"] = len(broken_links)
-    if broken_links:
+    anchor_links = []
+    filepath_links = []
+    for a in soup.find_all(href=True):
+        href = (a.get("href") or "").strip()
+        if not href:
+            continue
+        if href.startswith("#"):
+            if len(href) > 1:
+                anchor_links.append(a)
+        elif href.lower().startswith(external_prefixes):
+            continue  # external link, navigates fine
+        else:
+            filepath_links.append(a)  # relative path: dead in a single file
+
+    broken_anchors = [a for a in anchor_links if a["href"][1:] not in all_ids]
+    dead_links = len(broken_anchors) + len(filepath_links)
+    result.metrics["internal_link_count"] = len(anchor_links)
+    result.metrics["broken_anchor_count"] = len(broken_anchors)
+    result.metrics["dead_filelink_count"] = len(filepath_links)
+    # Kept as the headline "坏链" number: every link that cannot navigate.
+    result.metrics["broken_internal_link_count"] = dead_links
+    if broken_anchors:
         result.warnings.append(
-            f"{len(broken_links)}/{len(internal_links)} 个内部链接指向不存在的 id"
+            f"{len(broken_anchors)}/{len(anchor_links)} 个 #锚点链接指向不存在的 id"
             "（点击无法跳转）"
+        )
+    if filepath_links:
+        result.warnings.append(
+            f"{len(filepath_links)} 个链接是相对文件路径（如目录项），"
+            "单文件输出中无法跳转"
         )
 
     # ---- 8. Character recall (only when raw is available) ----------
