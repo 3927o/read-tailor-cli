@@ -580,3 +580,199 @@ token 成本（7-11k）和耗时（~37s）都在可接受范围，且**注释 0 
    确认行号信息对 AI 判断的实际增益有多大。
 4. 选定 plan_7 为主路线后，回写到 Rust pipeline 的工作量评估（栈算法 +
    注释配对在 Rust 侧重写 vs 调 Python）。
+
+---
+
+# 第二次会话：plan_7 复核 + pandoc 信息损失系统排查 + epub_recover
+
+> 本段记录另一个会话（分支 `claude/dazzling-babbage-i7GZs`）的完整实验。
+> 模型换成 **deepseek-v4-pro @ api.deepseek.com**（上一段是 mimo-v2.5-pro）。
+> 测试书目：查拉图斯特拉如是说 / 毛泽东选集 / 悲剧的诞生 / 查拉图斯特拉如是说_v2。
+
+## 22. plan_7 四本书复跑，以及"过于完美"指标的证伪
+
+四本书跑 plan_7（恢复处理前）：
+
+| 书 | chapter | section | noteref | note | orphan | jump | char_recall |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 查拉图斯特拉 | 5 | 198 | 0 | 0 | 0 | 0 | 99.99% |
+| 毛泽东选集 | 8 | 700 | 2619 | 2639 | 0 | 0 | 100% |
+| 悲剧的诞生 | 163* | 52 | 156 | 156 | 0 | 0 | 100% |
+| 查拉图斯特拉_v2 | 4 | 198 | 0 | 0 | 0 | 0 | 99.99% |
+
+\* 悲剧初次 163 章是误判（见 §25）。毛泽东 568+ 标题导致 AI 输出 JSON 被
+`max_tokens=8000` 截断，提高到 32000 后通过。
+
+**关键教训：plan_7 那些"完美"指标多半是构造出来的，不是质量证据。**
+- `noteref_to_note_orphan_count=0` 是**恒等式**：未配对的 `<a>` 根本不被标
+  `data-role="noteref"`，分母里只剩已配对的，孤儿永远 0。
+- `heading_jump_count=0` 是**建树时强制**：`open_section` 按 stack 深度重算
+  层级，AI 给 1→3 也会被压成 1→2，不可能跳级。
+- `unknown_block_count=0` 是**没实现**：plan_7 根本不写 `data-role="unknown"`。
+- 初次报"noteref 召回率 50%"是**分母数错**：把 forward ref + back ref 都算进
+  raw 锚点总数（注释锚点是成对的）。按真·双向配对算，召回是 **100%/99.1%**
+  （悲剧 156/156，毛泽东 2619/2642，漏 23 个是单向/非首节点）。
+- 初次报"段落丢 25%"也是**分母错**：注释体从 `<p>` 变 `<div data-role="note">`
+  从 `<p>` 计数里消失，但**字符召回 100%**，内容没丢。
+
+## 23. hr→separator 与 char-recall 指标
+
+- plan_7：`<hr>` 不再静默丢弃，改为 `<div data-role="separator">`（文集类书
+  靠 hr 分隔篇目）。验证悲剧输出 7 个 separator == raw 的 7 个 hr。
+- evaluator：新增 `_visible_text_chars`，对比 raw 与输出的可见字符数得
+  `char_recall`，<95% 告警。四本书均 ≥99.99%（丢的几个字是被丢的 `<header>`
+  wrapper 文本）。runner 对比表加"字符召回"列。
+- plan_7 `max_tokens` 8000→32000。
+- commit `51017d7`。
+
+## 24. 悲剧的诞生章节层级错乱 → EPUB file-title 注入
+
+现象：plan_7 给悲剧的诞生切出大量"数字章"（'145' '146' … '87' …）。
+
+根因（拆 EPUB 验证）：raw HTML 里只有 3 个 h1 + **213 个 class 全相同的 h2**。
+真正的大章名（"哲人尼采剪影""尼采美学概要""悲剧的诞生（1872）""瓦格纳在
+拜洛伊特""出自艺术家和作家的灵魂""观点与格言杂编""飘泊者和他的影子"）
+**只存在于每个 chapterN.xhtml 的 `<title>` 里**，body 里没有。pandoc flatten
+多文件时只保留各文件 `<body>`、**丢弃 `<title>`** → 大章归属信息在 step1 就
+没了，下游任何 AI 都无法恢复。
+
+修法：`common/epub_recover.py::inject_file_titles`（最初是独立的
+`epub_title_inject.py`，后并入）。读 EPUB spine 的「文件→title」，在 pandoc
+留下的文件边界锚点 `<span id="chapterN.xhtml">` 处注入
+`<h1 data-source="epub-file-title">`，但**仅当标题确实缺失**时。
+
+注入判据（每个 spine 文件）：文件 body 有 ≥1 个 heading 且**没有任何 heading
+已经等于该 title**。匹配规则两轮加固：
+- 先 strip 字面标签（有的 EPUB 在 `<title>` 里塞转义 `<a>` 标记）、note 括号
+  （〔1〕/[1]）、星号标记（`实践论*`→`实践论`），归一空白。
+- 用**前缀匹配**（`heading == title` 或 `heading 以 title 开头`），不用任意子串
+  —— 躲开"`187` ⊂ 长标题里的 `1878`"这种数字误匹配。
+
+结果：悲剧注入 7、毛泽东 0（卷/文件名本就在 body，避免"第一卷/第一卷"重复）、
+查拉 0。注入后悲剧 plan_7 chapter 9 个、层级全对（哲人尼采剪影 8 节、悲剧的诞生
+26 节、出自艺术家…79 节 等正确嵌套），char_recall 仍 100%。commit `0a2f3fe`。
+
+## 25. 查拉图斯特拉注释丢失：根因与隔离实验
+
+现象：raw 里 0 个 `<aside>`、注释正文消失、正文留 1377 个悬空 `[N]`。
+EPUB 原始结构：noteref `<a epub:type="noteref" href="part0091.xhtml#rearnote_N">`
+（**跨文件**），note body `<aside epub:type="rearnote" id="rearnote_N">`（1377 个，
+全在 part0091.xhtml）。
+
+隔离实验（合成最小 EPUB，逐一控制变量）：
+1. **变体 A**：1377 个 rearnote→footnote、保持跨文件 → 注释照样全丢。
+   ⟹ 改 epub:type 值**没用**（推翻了上一段会话里"footnote 是 workaround"的说法，
+   那其实是 z-lib 变体同时用了同文件 href 的功劳）。
+2. **same vs cross**（都用 footnote，只切同/跨文件）：同文件→被提升成原生脚注、
+   存活；跨文件→丢。⟹ **跨文件才是触发条件**。
+3. **孤儿 aside**（同文件、无任何 ref 指它）：照样丢。⟹ 抑制是**无条件**的：
+   pandoc 见到 footnote/rearnote 的 aside 就先抹掉，只有同文件 noteref 能把它
+   提升回来，否则永久消失。
+4. **epub:type 扫描**：只有 `footnote` 和 `rearnote` 被抑制；
+   `endnote`/`note`/`annotation`/`sidebar`/`biblioentry`/`glossary`/无 全部存活。
+
+不对称性确认：跨文件 noteref（普通 `<a>`）即使目标不存在也**保留**（变悬空链接）；
+note body（aside）则被无条件抑制。
+
+href 改写规则：`part0091.xhtml#rearnote_1` → `#part0091.xhtml_rearnote_1`
+（`{basename}_{frag}`，`#`→`_`；`../Notes/x.xhtml#n` 也取 basename `x.xhtml`）。
+另发现：被提升前 pandoc 改写了**引用**，但被指向**元素的 id 原样不动**、也不建
+per-target 锚点 → **pandoc 自己产出的跨文件链接其实也是断的**（这解释了为什么
+真实 raw 里 0 个 `part0091.xhtml_rearnote_N` 锚点）。
+
+## 26. epub_recover 注释恢复（由悬空引用驱动）
+
+`common/epub_recover.py::inject_dropped_notes`：
+- **由悬空 `#` 引用驱动**，不是由 EPUB aside 驱动 —— 这样 pandoc 已正确保留的
+  注释（同文件提升）不会被重复注入。
+- EPUB 每个 footnote/rearnote aside 预算改写 id = `{basename}_{orig_id}`，仅当它
+  命中某个**悬空** ref 且 raw 里**尚不存在**该 id 时才注入。
+- 注入时改写 aside 内部回链 href（`_pandoc_fragment` 同一套 basename 规则），
+  重建双向 noteref↔note 链。
+- 只认 `{footnote, rearnote}`（§25 实验确定的抑制集合）。
+
+验证查拉：1377 注释全恢复、note 1377、orphan 0、坏链 1377→0、char_recall
+99.99%→100%；plan_7 的确定性 `detect_note_pairs` 把恢复的注释全部正确配对、
+规范化成 `<div data-role="note" id="note-0001">`。悲剧注入 0（同文件、本就正常）、
+毛泽东注入 0（23 个悬空 ref 不是 aside，守卫正确跳过）。commit `f6c83be`。
+
+`epub_recover` 同时含 titles + notes 两个恢复器 + `recover()` 合并入口 + CLI
+（in-place 改写自动留 `.bak`）。
+
+## 27. 毛泽东选集的两类断链 + evaluator 死链盲区
+
+**(a) 23 个 `#` 悬空 ref = 源 EPUB 自带缺陷**：都是同文件 `#id` 引用，但目标
+锚点在该文件内不存在（如愚公移山标题后的 `*` 出处脚注有 `*` 标记、却没写注释体；
+少数编号注单边缺失）。整个 EPUB 都找不到目标，**不可恢复**，与 pandoc 无关。
+注入器正确不碰（它们不是 aside）。
+
+**(b) 410 个目录项 = 相对路径死链**：TOC 是 `<a href="../Text/Volume01.xhtml">`，
+pandoc 只改写带 `#fragment` 的链接、**对带 `../` 的整文件链接不改写**（见 §28
+探针）。flatten 成单文件后这些路径指向不存在的文件。**双重缺陷**：源 EPUB 里
+文件实际叫 `Volume01.xhtml.xhtml`（双扩展名），TOC 却指 `Volume01.xhtml`（单），
+源头就已指错。
+
+**evaluator 盲区修复**：旧坏链逻辑只看 `href.startswith("#")`，完全漏掉这 410 个。
+单文件输出里"非 `#锚点`、非外部 URL"的链接都是死的。现拆成
+`broken_anchor_count`（#锚点目标缺失）+ `dead_filelink_count`（相对路径），
+`broken_internal_link_count` = 两者之和（毛泽东 = 23 + 410 = 433）。commit `887b127`。
+
+**重要区分**：把"扩展 epub_recover 成通用链接修复器"想成能顺手修 TOC 是错的——
+那个修复器由悬空 `#` 引用驱动，而 TOC 链接是相对路径、根本不是 `#`，不会被它处理。
+TOC 需要独立机制（文件路径链接→`#锚点`重写 + 模糊 basename 匹配双扩展名 + 保证
+目标 section 可达）。
+
+## 28. pandoc id/href 系统性探针（pandoc 3.9，已固化进仓库）
+
+为了不再"撞一个现象解释一个现象"，做了系统矩阵实验
+`pandoc_id_href_probe.py`（commit `5538d29`）。**v1 探针有检测 bug**（按会被
+pandoc 改写的 marker 文本定位，导致"提升成原生脚注"的用例误判，如
+`same footnt+ntref` 实际完美工作却被报成断链）。v2 改用**链接图判定**（看正文
+引用的 `#` 目标子树是否真含目标内容），鲁棒。
+
+**验证过的规则（pandoc 3.9 = 本项目生产版本）：**
+
+跨文件 `other.xhtml#frag` 引用能否解析，取决于**目标标签的 AST 节点带不带 Attr**：
+
+| 目标元素 | id 命运 | 跨文件引用 |
+|---|---|---|
+| div / span / section / h1-6 / li / a | 保留 + 加前缀 `{file}_{id}` | ✅ 解析 |
+| **p / sup / sub / em / strong** | **丢弃**（AST 无 Attr）| ❌ 断 |
+| aside（非suppressed）/ table | 保留但**不加前缀** | ❌ 引用对不上 |
+| aside footnote / rearnote | **抑制丢弃**（除非同文件 noteref 提升）| ❌ |
+
+⚠️ 注释标记常放在 `<sup>` 上 —— 它会**丢 id**。
+
+href 改写：
+- `other.xhtml#frag` → `#other.xhtml_frag`；`#frag`（同文件）→ `#thisfile.xhtml_frag`
+- `other.xhtml`（裸路径，无 fragment）→ `#other.xhtml`（跳到文件边界锚点，TOC 够用）
+- `../dir/other.xhtml` → **不改写**，留相对路径 → 死链
+- id 格式：`. _ - :` 与前导数字都 OK；**unicode id 出 bug**（畸形双 `#`）
+- 同文件 footnote+noteref → 正确提升成 `<section class="footnotes">`，双向链完好
+
+**未覆盖/局限**：只测 pandoc 3.9（已确认即生产版本）；table/figure 用例可能受
+fixture 影响（无 thead / 无 img）；EPUB2（NCX/class-based）未建模；
+`<div epub:type=footnote>`、`<dt>/<dd>`、跨文件同名 raw id 碰撞未建模。
+扩展时往 `CASES` 加即可。
+
+## 29. 本轮 commit 清单（分支 claude/dazzling-babbage-i7GZs）
+
+| commit | 内容 |
+|---|---|
+| `51017d7` | char-recall 指标 + plan_7 hr→separator + max_tokens 32000 |
+| `0a2f3fe` | epub 标题恢复（file `<title>` 注入），后并入 epub_recover |
+| `f6c83be` | epub 注释恢复（rearnote/footnote）+ 坏链指标；合并成 epub_recover |
+| `887b127` | evaluator 死链盲区修复（相对路径目录链接计入坏链）|
+| `5538d29` | pandoc id/href 探针固化进仓库 |
+
+## 30. 本轮 open 问题与下一步
+
+1. **通用链接修复器**（覆盖 §28 的 p/sup 丢 id、aside/table 不加前缀几类
+   "内容还在、id 没对上"）—— 可重附 id；但**不含 TOC**（见 §27）。
+2. **TOC 专项修复**：相对路径/whole-file 链接→`#section` 锚点重写，需建
+   「文件→规范化 section id」映射 + 模糊 basename 匹配（应对双扩展名源缺陷）。
+3. **移植到 Rust 管道**：epub_recover 是 step1（pandoc）之后的后处理原型，
+   逻辑（读 EPUB zip → spine/notes → 按 basename 规则注入）需移到
+   `src/pipeline/steps.rs`。
+4. 源 EPUB 自带缺陷（§27a 的 23 个、双扩展名）大多不可程序恢复，靠坏链指标
+   如实暴露即可，不应粉饰。
