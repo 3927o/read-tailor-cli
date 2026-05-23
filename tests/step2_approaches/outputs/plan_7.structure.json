@@ -9,7 +9,7 @@
     "bodymatter_id": "bodymatter",
     "toc_id": "",
     "has_toc": false,
-    "has_notes_section": false
+    "has_notes_section": true
   },
   "chapters": [
     {
@@ -38,7 +38,7 @@
       "title": "查拉图斯特拉如是说",
       "section_count": 198,
       "paragraph_count": 3841,
-      "note_ref_count": 0,
+      "note_ref_count": 1377,
       "unknown_block_count": 0,
       "sections": [
         {
@@ -1253,8 +1253,8 @@
     }
   ],
   "notes": {
-    "note_ref_count": 0,
-    "notes_section_id": ""
+    "note_ref_count": 1377,
+    "notes_section_id": "book-notes"
   },
   "unknown_blocks": [],
   "stats": {

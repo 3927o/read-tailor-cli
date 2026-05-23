@@ -177,6 +177,26 @@ def evaluate(
     toc = soup.find(attrs={"data-role": "toc"})
     result.metrics["has_toc"] = toc is not None
 
+    # ---- 7b. Internal link integrity -------------------------------
+    # How many in-document links (href="#...") point at an id that does not
+    # exist? These render as dead clicks ("无法跳转"). The dominant cause is a
+    # noteref whose note body was dropped upstream (the pandoc rearnote bug),
+    # but it also catches any cross-reference the normalizer fails to wire.
+    all_ids = {el.get("id") for el in soup.find_all(id=True) if el.get("id")}
+    internal_links = [
+        a
+        for a in soup.find_all(href=True)
+        if (a.get("href") or "").startswith("#") and len(a.get("href")) > 1
+    ]
+    broken_links = [a for a in internal_links if a["href"][1:] not in all_ids]
+    result.metrics["internal_link_count"] = len(internal_links)
+    result.metrics["broken_internal_link_count"] = len(broken_links)
+    if broken_links:
+        result.warnings.append(
+            f"{len(broken_links)}/{len(internal_links)} 个内部链接指向不存在的 id"
+            "（点击无法跳转）"
+        )
+
     # ---- 8. Character recall (only when raw is available) ----------
     # Compares visible-text character counts between the raw input and the
     # normalized output. 100% means no text was silently dropped; lower

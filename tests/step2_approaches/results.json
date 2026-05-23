@@ -1,7 +1,7 @@
 [
   {
     "approach": "7: program-first + AI labels",
-    "time_seconds": 36.38,
+    "time_seconds": 35.83,
     "ai_tokens": 11044,
     "pass": true,
     "errors": [],
@@ -11,14 +11,16 @@
       "section_count": 198,
       "paragraph_count": 3874,
       "heading_jump_count": 0,
-      "noteref_count": 0,
-      "note_count": 0,
+      "noteref_count": 1377,
+      "note_count": 1377,
       "noteref_to_note_orphan_count": 0,
       "unknown_block_count": 0,
       "has_toc": false,
-      "raw_char_count": 198810,
-      "out_char_count": 198800,
-      "char_recall": 0.9999,
+      "internal_link_count": 2754,
+      "broken_internal_link_count": 0,
+      "raw_char_count": 262643,
+      "out_char_count": 262633,
+      "char_recall": 1.0,
       "structure_json_chapter_count": 5,
       "structure_json_paragraph_count": 3874
     }

@@ -112,7 +112,7 @@ def print_comparison(all_results: list[dict]) -> None:
     header = (
         f"{'方案':<32} {'耗时(s)':>8} {'tokens':>8} {'章节':>5} "
         f"{'noteref':>8} {'note':>5} {'orphan':>7} {'jump':>5} "
-        f"{'字符召回':>9} {'状态':>6}"
+        f"{'字符召回':>9} {'坏链':>6} {'状态':>6}"
     )
     print(header)
     print("-" * len(header))
@@ -131,6 +131,7 @@ def print_comparison(all_results: list[dict]) -> None:
             f"{m.get('noteref_to_note_orphan_count', '?'):>7} "
             f"{m.get('heading_jump_count', '?'):>5} "
             f"{recall_str:>9} "
+            f"{m.get('broken_internal_link_count', '?'):>6} "
             f"{status:>6}"
         )
     print("-" * len(header))
