@@ -307,6 +307,7 @@ def build_normalized(raw_html: str, decisions: dict[int, dict], doc_meta: dict) 
     stack: list[dict] = []  # {'level': ai_level, 'section': tag, 'heading': tag}
     chap_counter = [0]
     pending_prefix: list[str] = []
+    pending_ids: list[str] = []  # referenced ids from merged-away headings
 
     def open_section(ai_level: int, source_heading: Tag) -> None:
         while stack and stack[-1]["level"] >= ai_level:
@@ -334,6 +335,21 @@ def build_normalized(raw_html: str, decisions: dict[int, dict], doc_meta: dict) 
                 heading.append(out.new_string(str(child)))
             elif isinstance(child, Tag):
                 heading.append(_clone(out, child))
+        # Carry every referenced id of this heading (and of any heading merged
+        # into it) so TOC entries that point at a chapter heading — including
+        # the split-title fragment that became a `merge` — still resolve. One
+        # id rides on the heading; extras become empty anchor spans.
+        ref_ids = list(pending_ids)
+        pending_ids.clear()
+        hid = source_heading.get("id")
+        if hid and hid in referenced_ids and hid not in ref_ids:
+            ref_ids.append(hid)
+        if ref_ids:
+            heading["id"] = ref_ids[0]
+            for extra in ref_ids[1:]:
+                anchor = out.new_tag("span")
+                anchor["id"] = extra
+                heading.append(anchor)
         sec.append(heading)
         parent.append(sec)
         stack.append({"level": ai_level, "section": sec, "heading": heading})
@@ -341,6 +357,22 @@ def build_normalized(raw_html: str, decisions: dict[int, dict], doc_meta: dict) 
     def attach_content(node: Tag) -> None:
         target = stack[-1]["section"] if stack else bodymatter
         target.append(_clone(out, node))
+
+    # Ids that some in-document link points at. An otherwise-empty block is
+    # kept iff it (or a descendant) carries one of these ids — this preserves
+    # pandoc's empty file-boundary <span id="partNN.xhtml"> markers that a TOC
+    # links to, while still dropping decorative empty blocks nobody references.
+    referenced_ids = {
+        href[1:]
+        for a in body.find_all("a", href=True)
+        for href in [(a.get("href") or "").strip()]
+        if href.startswith("#") and len(href) > 1
+    }
+
+    def _is_referenced_anchor(block: Tag) -> bool:
+        if block.get("id") in referenced_ids:
+            return True
+        return any(d.get("id") in referenced_ids for d in block.find_all(id=True))
 
     def process(node: Tag) -> None:
         # Document-order walk that splits content at headings. Headings are
@@ -370,6 +402,9 @@ def build_normalized(raw_html: str, decisions: dict[int, dict], doc_meta: dict) 
                     continue
                 if decision.get("merge"):
                     pending_prefix.append(text)
+                    mid = block.get("id")
+                    if mid and mid in referenced_ids:
+                        pending_ids.append(mid)
                     continue
                 try:
                     level = max(1, int(decision.get("level") or 1))
@@ -379,8 +414,10 @@ def build_normalized(raw_html: str, decisions: dict[int, dict], doc_meta: dict) 
                 continue
             if block.find(HEADINGS):
                 process(block)
-            elif block.get_text(strip=True) or block.find(
-                ["img", "svg", "picture", "audio", "video"]
+            elif (
+                block.get_text(strip=True)
+                or block.find(["img", "svg", "picture", "audio", "video"])
+                or _is_referenced_anchor(block)
             ):
                 attach_content(block)
 

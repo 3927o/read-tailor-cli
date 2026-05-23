@@ -50,6 +50,7 @@ import posixpath
 import re
 import sys
 import zipfile
+from collections import Counter
 
 from bs4 import BeautifulSoup, Tag
 
@@ -264,9 +265,19 @@ def inject_file_titles(
     if body is None:
         return [{"action": "skipped:no-body"}]
 
+    spine = _read_epub_spine(epub_path)
+    # A <title> shared by more than one spine file is a global/book title (many
+    # EPUBs stamp the book name into every file's <title>), never a per-file
+    # chapter name. Injecting it would brand every chapter with the book title,
+    # so only titles UNIQUE to their file are eligible.
+    title_counts = Counter(_norm(e["title"]) for e in spine if _norm(e["title"]))
+
     log: list[dict] = []
-    for entry in _read_epub_spine(epub_path):
+    for entry in spine:
         fn, title = entry["filename"], entry["title"]
+        if title_counts.get(_norm(title), 0) > 1:
+            log.append({"filename": fn, "title": title, "action": "skipped:shared-title"})
+            continue
         if not _wants_title_injection(entry):
             reason = (
                 "no-title"
