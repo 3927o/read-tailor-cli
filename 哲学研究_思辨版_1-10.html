@@ -1,15 +1,15 @@
-<!DOCTYPE html>
-<html lang="zh"><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>哲学研究 · 思辨版 §1–§10</title>
-<style>
-:root{--bg:#f7f4ee;--card:#fffdf8;--ink:#23201b;--muted:#8a8276;--line:#e7e0d4;--accent:#9a5b34;--reveal:#f3ede0;--chip:#8a4f2c}
-@media(prefers-color-scheme:dark){:root{--bg:#15140f;--card:#1d1b15;--ink:#e9e4d8;--muted:#9c9384;--line:#332f26;--accent:#d79a6c;--reveal:#24211a;--chip:#d79a6c}}
+<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>哲学研究 · 思辨版 §1–§10</title><style>
+:root{--bg:#f7f4ee;--card:#fffdf8;--ink:#23201b;--muted:#8a8276;--line:#e7e0d4;--accent:#9a5b34;--reveal:#f3ede0;--chip:#8a4f2c;--plainbg:#eef3ee;--plainink:#33402f}
+@media(prefers-color-scheme:dark){:root{--bg:#15140f;--card:#1d1b15;--ink:#e9e4d8;--muted:#9c9384;--line:#332f26;--accent:#d79a6c;--reveal:#24211a;--chip:#d79a6c;--plainbg:#1b211a;--plainink:#bcd0b6}}
 *{box-sizing:border-box}html,body{margin:0;padding:0;background:var(--bg);color:var(--ink)}
-body{font-family:"Noto Serif CJK SC","Songti SC","Source Han Serif SC",Georgia,serif;font-size:18px;line-height:1.9;-webkit-text-size-adjust:100%;padding:env(safe-area-inset-top) 0 6rem}
+body{font-family:"Noto Serif CJK SC","Songti SC","Source Han Serif SC",Georgia,serif;font-size:18px;line-height:1.9;-webkit-text-size-adjust:100%;padding:0 0 6rem}
 .wrap{max-width:680px;margin:0 auto;padding:0 18px}
-header{padding:34px 0 8px;text-align:center}header .t{font-size:1.5rem;font-weight:700}header .s{color:var(--muted);font-size:.85rem;margin-top:6px;line-height:1.6}
+.toolbar{position:sticky;top:0;z-index:9;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:env(safe-area-inset-top) 0 0}
+.toolbar .inner{max-width:680px;margin:0 auto;padding:9px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.toolbar .lab{font-size:.82rem;color:var(--muted)}
+.toggle{appearance:none;border:1px solid var(--line);background:var(--card);color:var(--accent);font-family:inherit;font-weight:700;font-size:.84rem;padding:7px 14px;border-radius:999px;cursor:pointer}
+body.show-plain .toggle{background:var(--accent);color:var(--card);border-color:var(--accent)}
+header{padding:26px 0 8px;text-align:center}header .t{font-size:1.5rem;font-weight:700}header .s{color:var(--muted);font-size:.85rem;margin-top:6px;line-height:1.6}
 hr.div{border:0;border-top:1px solid var(--line);margin:26px 0}
 details.guide{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:4px 18px;margin:18px 0 8px}
 details.guide summary{cursor:pointer;font-weight:700;color:var(--accent);padding:12px 0;list-style:none;font-size:1rem}
@@ -20,9 +20,11 @@ section.remark{background:var(--card);border:1px solid var(--line);border-radius
 .move{display:inline-block;margin:0 0 12px 10px;font-size:.72rem;font-weight:700;color:var(--card);background:var(--chip);padding:3px 9px;border-radius:999px;vertical-align:2px}
 section.connective{background:transparent;border-style:dashed}
 section.remark p,section.remark blockquote{margin:.7em 0}
-.orig{}
 blockquote.orig{padding:8px 14px;border-left:3px solid var(--line);color:var(--muted);font-style:italic;font-size:.96rem}
 sup.note{color:var(--muted);font-size:.62em;vertical-align:super;padding:0 1px}
+.plain{display:none;margin:.35em 0 .9em;padding:10px 13px 10px 14px;background:var(--plainbg);color:var(--plainink);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;font-size:.92rem;line-height:1.78}
+body.show-plain .plain{display:block}
+.plain::before{content:"白话";display:inline-block;font-size:.64rem;font-weight:700;color:var(--accent);letter-spacing:.08em;margin-right:8px;vertical-align:1px;opacity:.8}
 .setup{margin:16px 0 6px;font-style:italic;color:var(--accent);border-top:1px dashed var(--line);padding-top:14px;line-height:1.8}.setup b{font-style:normal}
 .reveal{margin-top:10px}
 .reveal>button{appearance:none;border:1px solid var(--line);background:var(--reveal);color:var(--accent);font-family:inherit;font-size:.9rem;font-weight:700;padding:9px 14px;border-radius:12px;cursor:pointer;width:100%;text-align:left}
@@ -33,21 +35,27 @@ sup.note{color:var(--muted);font-size:.62em;vertical-align:super;padding:0 1px}
 footer{color:var(--muted);font-size:.85rem;text-align:center;margin:30px 0 0;line-height:1.7}footer b{color:var(--accent)}
 .tip{color:var(--muted);font-size:.8rem;text-align:center;margin:6px 0 0}
 .lossnote{color:var(--muted);font-size:.72rem;text-align:center;margin:14px 0 0}
-</style></head><body><div class="wrap">
+</style></head><body>
+<div class="toolbar"><div class="inner"><span class="lab">读不动？打开白话，每段原文下给一句大白话</span><button class="toggle" id="pt">白话辅助 关</button></div></div>
+<div class="wrap">
 <header><div class="t">哲学研究</div><div class="s">维特根斯坦 著 · 楼巍 译<br>开篇 §1–§10 · 思辨阅读版</div></header>
 <details class="guide" open><summary>读前一分钟 · 这十节在干嘛</summary><div class="gbody">
 开篇十节是一套<b>"先送战场，再收回来"</b>的连招。<br><br>
 维特根斯坦<b>没有</b>一上来反驳奥古斯丁。他先把"词=对象的名字、意义=词所代表的那个对象"这幅图画<b>极清晰地立起来</b>（§1），然后<b>造一种让这幅图画完全成立的语言</b>（§2 工匠的"块石/石板"），再诊断出：图画不是<b>错</b>，是<b>把一小块特例当成了语言的全体</b>（§3–4）。接着换进他自己的方法和正面概念——<b>语言游戏</b>（§7），把游戏逐步做复杂以逼出"词分不同种类"（§8–9），最后在 §10 把"词标示对象"<b>轻轻卸掉</b>。<br><br>
-读法：<b>正文一字未改，是原文；</b>橙色标签、▷设问、▽确认都是附加的导读。设问先自己想，想好了再点开确认。
+读法：<b>正文一字未改，是原文。</b>读着吃力就点右上角<b>"白话辅助"</b>，每段下会出现一句大白话；橙标签、▷设问、▽确认是思辨导读，设问先自己想再点开确认。
 </div></details>
 
 <section class="remark" id="s1">
 <span class="num">§1</span>
 <span class="move">布饵 → 第一道裂缝</span>
 <blockquote class="orig" data-orig="1">奥古斯丁在《忏悔录》第一卷第八节中说：“当成人称呼某个对象并且转向这个对象时，我注意到这个情况，并且明白这个对象是用他们发出的声音来标示的，因为他们想要把它给指出来。然而，这些我是从他们的姿势中获知的。这些姿势是所有民族的自然语言。借助表情和眼睛的作用，借助肢体的运动和语调，这种语言表明了心灵在渴望什么或坚持什么或拒绝什么或逃避什么时的种种感受。就这样，我一遍遍地听到那些词在不同句子的特定位置上被说出来，从而逐渐学会去理解这些词标示的是什么对象。一旦我的嘴巴熟悉了这些符号，我就用它们来表达我的愿望。”</blockquote>
+<p class="plain">奥古斯丁回忆自己小时候怎么学说话：大人一边看着某个东西一边发出声音，他就猜这个声音是在叫这个东西；再加上表情、手势、语气，他慢慢明白每个词指的是哪样东西，学会后就用这些词说出自己想要什么。</p>
 <p class="orig" data-orig="1">在我看来，我们从这段文字中得到了一幅关于人类语言的本质的特殊图画。也就是说：语言中的词语是对象的名称——命题是这种名称的结合。——在这幅关于语言的图画中，我们找到了如下观念的根源：每个词都有一个意义，意义与词语相对应，意义就是词语代表的对象。</p>
+<p class="plain">维特根斯坦说：奥古斯丁这段话背后藏着一幅“语言是什么”的图画——词就是东西的名字，句子就是一串名字拼起来；每个词都有一个意义，而这个意义，就是它所代表的那个东西。</p>
 <p class="orig" data-orig="1">奥古斯丁并未提及词类的区别。我认为，以这样的方式来描述对语言的学习的人首先想到的是名词，比如“桌子”“椅子”“面包”，以及人的名字，其次才想到某些行为和属性的名称，并且把剩下的词类视为某种会自行就位的东西。</p>
+<p class="plain">这种看法心里想的主要是“桌子”“椅子”这类名词和人名；动词、形容词这些它先不太管，好像它们自己会各就各位。</p>
 <p class="orig" data-orig="1">现在设想一下语言的这种应用：我让某人去购物。我给他一张纸条，上面写着“五个红苹果”。他将这个纸条递给卖家，后者打开那个上面写着“苹果”的抽屉，然后在一张图表上寻找“红”这个词并找到与之对应的色样，然后他按照顺序念出基数词——我假定他记住了它们——直到“五”这个词。每说一个数词，他就从抽屉里拿出一个与色样颜色相同的苹果。——人们就是以这样的以及类似的方式使用词语的。——“但是他怎么知道该去哪里以及怎样寻找‘红’这个词，又怎么知道该拿‘五’这个词怎么办呢？”——好吧，我假定他就是像我说的这样行动的。解释终有一个终点。——但什么是“五”这个词的意义呢？——这里根本没有说到什么意义，说的只是“五”这个词是如何被使用的。</p>
+<p class="plain">举例：我让人拿着写“五个红苹果”的纸条去买东西。店员对着“苹果”找抽屉、对着“红”找色卡、数到“五”就拿五个。有人会追问：他怎么知道“红”“五”该怎么用？回答是——他就这么做了，追问总得有个尽头。那“五”的意义到底是什么？这里压根没谈“意义”，谈的只是“五”这个词是怎么被用的。</p>
 <p class="setup">▷ 看 §1 结尾——他没有回答"五的意义<b>是</b>什么"，他做了<b>别的</b>。他做了什么？</p>
 <div class="reveal"><button>看他做了什么 ▽</button><div class="confirm">他把问题从"意义<b>是</b>什么"悄悄换成了"这个词怎么<b>被用</b>"。整本书的主题，在这一句里第一次、不声不响地出现了——这就是埋在奥古斯丁图画里的第一道裂缝。</div></div>
 </section>
@@ -56,7 +64,9 @@ footer{color:var(--muted);font-size:.85rem;text-align:center;margin:30px 0 0;lin
 <span class="num">§2</span>
 <span class="move">让步，而不是反驳</span>
 <p class="orig" data-orig="1">关于意义的那种哲学观念来自对语言的作用方式的一种原始的看法。但是也可以说这是关于一种比我们的语言更原始的语言的看法。</p>
+<p class="plain">那种关于“意义”的哲学观念，来自一种很原始的语言想象；也可以说，它描述的其实是一种比我们日常语言更原始的语言。</p>
 <p class="orig" data-orig="1">让我们设想一种符合奥古斯丁给出的描述的语言：这种语言要用于一个建筑工人A和一个助手B之间的交流。A用一些建筑石料来建造一座房子，有块石、柱石、石板、横梁。B按照A需要的顺序将这些石料递给他。出于这个目的，他们使用一种由如下词语构成的语言：“块石”“柱石”“石板”“横梁”。A喊出这些词，——B把石头搬过来，他已经学会根据某种呼喊来搬动那种石头。——请将其视为一种完整的原始语言。</p>
+<p class="plain">那就设想一种正好符合奥古斯丁说法的语言：工地上工人A和助手B，A喊“块石／柱石／石板／横梁”，B就把对应的石头递过去。把这个就当成一种完整的语言来看。</p>
 <p class="setup">▷ 他本可以直接说"奥古斯丁错了"。他偏不，反而给对手造了一个<b>完美合身的战场</b>。为什么？</p>
 <div class="reveal"><button>看他的算盘 ▽</button><div class="confirm">因为他要让你<b>之后自己发现</b>——对的不是那幅图画，是图画<b>恰好合身的那一小块地方</b>。这一招贯穿全书，记住它。</div></div>
 </section>
@@ -65,20 +75,25 @@ footer{color:var(--muted);font-size:.85rem;text-align:center;margin:30px 0 0;lin
 <span class="num">§3</span>
 <span class="move">诊断：把局部当成了全体</span>
 <p class="orig" data-orig="1">我们可以说奥古斯丁描述了一个交流的系统，只不过并不是所有我们称之为语言的东西都是这样的系统。若在某些情况下出现了“这种描述可用还是不可用？”这个问题时，我们就得这样说。于是答案就是：“是的，是可用，但这只适用于这个被严格限定的区域，而不适用于你刚才声称要描述的那个全体。”</p>
+<p class="plain">可以说奥古斯丁描述的是“一种”沟通方式，但并不是所有叫“语言”的东西都长这样。要是有人问“他这描述到底管不管用”，答案是：管用，但只在这一小块范围里管用，不适用于他号称要描述的“整个语言”。</p>
 <p class="orig" data-orig="1">这就像某个人宣布：“玩游戏就是按照某些确定的规则在一个平面上移动一些东西……”——我们会回答他：你想到的似乎是棋类游戏，然而并非所有的游戏都是这样的。你可以将你的定义明确限定在这些游戏中，以此来纠正你的定义。</p>
+<p class="plain">好比有人宣布“游戏就是按规则在台面上挪动棋子”——我们会说：你想的是象棋那一类，可不是所有游戏都这样。你得把定义限定在那几种游戏里，它才站得住。</p>
 <div class="reveal"><button>这条的诊断 ▽</button><div class="confirm">奥古斯丁的毛病<b>不是说了假话，是把一种特例过度推广</b>。这是维特根斯坦对几乎所有哲学错误的标准诊断——后面会反复见到。</div></div>
 </section>
 
 <section class="remark connective" id="s4">
 <span class="num">§4</span>
 <p class="orig" data-orig="1">设想一套文字，其中的字母被用作声音的符号，但也被用作重音符号和标点符号。[可以将一套文字当作一种描述声音图案（Lautbildern）的语言。<span class="math-super"><sup class="note">[4]</sup></span>]现在设想某个人这样来理解这套文字，就好像每个字母只是对应着一个声音，就好像这些字母没有其他什么完全不同的功能了。这样一种关于这种文字的过于简单的看法就类似奥古斯丁关于语言的看法。</p>
+<p class="plain">想象一套字母，既用来表示读音，又拿来当重音符号和标点。如果有人以为每个字母只对应一个声音、再没别的功能，这种过于简单的理解，就跟奥古斯丁看语言的方式如出一辙。</p>
 <p class="aside">同一个诊断，换一个类比加固。不展开。</p>
 </section>
 
 <section class="remark connective" id="s5">
 <span class="num">§5</span>
 <p class="orig" data-orig="1">如果人们去观察第1节中的例子，那么他们或许会感觉到，关于词语意义的一般看法在多大程度上用一团迷雾包围了语言的功能，使我们无法清楚地看到它。——在一些原始的语言使用方式那里，我们能清楚地综观词语的目的和功能，如果从这些原始的使用方式入手来研究语言现象，那么迷雾就会消散。</p>
+<p class="plain">回头看 §1 那个例子就会感到：那种“词都各有意义”的笼统看法，给语言的运作蒙了一层雾，让我们看不清。而从最原始的用词方式入手——那里词的目的和功能一目了然——雾就散了。</p>
 <p class="orig" data-orig="1">孩子在学习说话的时候使用的就是这样一些原始的语言形式。语言的教学在这里并不是解释，而是一种训练。</p>
+<p class="plain">小孩学说话，用的正是这种最原始的语言形式。这里的“教”不是讲解释，而是训练。</p>
 <p class="aside">末尾"训练，而非解释"是一颗远雷：要到后面讲"遵守规则"才引爆。先记下。</p>
 </section>
 
@@ -86,9 +101,13 @@ footer{color:var(--muted);font-size:.85rem;text-align:center;margin:30px 0 0;lin
 <span class="num">§6</span>
 <span class="move">拆"意义 = 心里浮现的图画"</span>
 <p class="orig" data-orig="1">我们可以想象第2节中的语言是A和B的<span class="calibre3">全部</span>语言，甚至是一个部落的全部语言。孩子们被教育去做<span class="calibre3">这些事</span>，同时去使用<span class="calibre3">这些</span>词，以<span class="calibre3">这样的方式</span>对其他人的话作出反应。</p>
+<p class="plain">设想 §2 那种语言就是A、B（甚至整个部落）的全部语言。教法是：老师指着东西、把孩子的注意力引过去，同时说出那个词，比如指着石板说“石板”。</p>
 <p class="orig" data-orig="1">这种训练的一个重要部分是教孩子的老师用手指向这些对象，将他们的注意力引向这些对象，同时说出一个词。比如在展示石板的样子时说出“石板”一词。（我不想将其称为“指物解释”或“定义”，因为孩子还不能就名称<span class="calibre3">发问</span>。我想称其为“指物教词法”。——我说这将构成这种训练的一个重要部分，因为人的情况就是这样的，不是因为不能去设想其他的情况。）人们可以说这种指物教词法在词语和事物之间建立了一种联想式的联系。但这意味着什么呢？好吧，它可以意味很多东西。不过，也许人们首先想到的是孩子听到这个词的时候事物的图画便在他的心里浮现出来。然而，如果这事现在发生了，——那这就是词语的目的吗？——是的，它<span class="calibre3">可以</span>是目的。——我可以设想对于词语（一串声音）的这样一种使用。（说出一个词就像在一架想象的钢琴上敲一个键。）但是在第2节的语言中，唤起意象<span class="math-super"><sup class="note">[5]</sup></span>并<span class="calibre3">不是</span>词语的目的。（当然人们也可以发现它有助于达成真正的目的。）</p>
+<p class="plain">有人会说“指物教词法”在词和东西之间建立了一种联想——一听到词，心里就浮现那东西的图像。就算真这样，这就是词的目的吗？可以是。但在 §2 那种语言里，让你心里冒出图像并不是词的目的。</p>
 <p class="orig" data-orig="1">但是，如果指物教词法具有这样的效果，——我该不该说它影响了对于词语的理解呢？难道不是以这样那样的方式依照“石板！”这个喊声而行动的人才理解它吗？——但是指物教词法也许有助于达成这一点。但也只能与一种特定的教学法相联系才可以。与另一种不同的教学法联系在一起，针对这些词的相同的指物教词法就会带来完全不同的理解。</p>
+<p class="plain">假如指物教词法真有“让人心里浮现图像”这效果，我该不该说它帮助了对词的“理解”？可真正理解“石板！”的人，难道不是那个一听就照着去搬石头的人吗？同一套指物教词法，配上不同的后续训练，会教出完全不同的理解。</p>
 <p class="orig" data-orig="1">“我把这根杆子和这个手柄连接在一起，就把刹车装好了。”——是这样的，如果机械装置的所有其他部分也具备的话。只有与它们连接在一起，这才是一个刹车杆，从它的支架中分离出来，它甚至不是一个手柄。它可以什么都是，或什么也不是。</p>
+<p class="plain">就像“把这根杆子接到手柄上，刹车就装好了”——前提是机器其余部件都在。只有接进整套装置里，它才是刹车杆；单拎出来，它连手柄都算不上：什么都可以是，也什么都不是。</p>
 <p class="setup">▷ 跟着刹车杆那句想——一根杆子<b>单独拿出来</b>，是刹车杆吗？那么一个词"在心里冒出的那张图"，单独拿出来，是它的意义吗？</p>
 <div class="reveal"><button>看他在拆什么 ▽</button><div class="confirm">意义<b>不在</b>那张心里的图，而在这个词<b>在整套实践里扮演的角色</b>。脱了支架的杆子什么都不是；脱了语言实践的"心里的图"也一样。他在拆的，是"意义是一种内心伴随物"这个念头。</div></div>
 </section>
@@ -97,21 +116,28 @@ footer{color:var(--muted);font-size:.85rem;text-align:center;margin:30px 0 0;lin
 <span class="num">§7</span>
 <span class="move">安装核心概念：语言游戏</span>
 <p class="orig" data-orig="1">在语言（2）<span class="math-super"><sup class="note">[6]</sup></span>的使用实践中，一方喊出那个词，另一方依照它来行动。然而，在语言教学中也会出现<span class="calibre3">这样</span>的事：学习者<span class="calibre3">说出</span>这些对象的<span class="calibre3">名称</span>。换言之就是：当老师指向一种石料的时候，他说出那个词。——确实，这里还会有更简单的练习：学生跟着老师念一个词——这两者都是与说话相类似的事情。</p>
+<p class="plain">在 §2 语言的实际使用里，一方喊词、另一方照做。教学时还会反过来：老师指石料，学生说出名字；更简单的还有学生跟着念词——这些都跟“说话”沾边。</p>
 <p class="orig" data-orig="1">我们也可以设想（2）中使用语言的整件事是某些游戏中的一种，孩子就是通过这些游戏来学习母语的。我想把这些游戏称为“语言游戏”，有时我也将一种原始的语言称为一种语言游戏。</p>
+<p class="plain">也可以把 §2 这种用语言的整件事，看成孩子学母语时玩的众多游戏之一。我想把这些游戏叫做“语言游戏”，有时也把一种原始语言本身叫一个语言游戏。</p>
 <p class="orig" data-orig="1">说出石料的名称，跟着念一些词，这些事情也可以被称为语言游戏。想一想词语在跳圈圈游戏中<span class="math-super"><sup class="note">[7]</sup></span>的一些用法吧。</p>
+<p class="plain">说出石料名字、跟着念词，这些也都算语言游戏。想想词在跳圈圈这类游戏里的用法。</p>
 <p class="orig" data-orig="1">我也会把那个由语言以及与语言交织在一起的那些行为构成的整体称为“语言游戏”。</p>
+<p class="plain">我还会把“语言，以及跟语言交织在一起的那些活动”整个儿，称作“语言游戏”。</p>
 <div class="reveal"><button>这个词为什么重要 ▽</button><div class="confirm">全书最重要的词第一次出现。<b>注意定义里塞进了"行为"</b>——语言游戏不是"词"，是<b>词 + 用词的活动</b>拧在一起的整体。这是用来取代奥古斯丁"词=名字"的正面工具。</div></div>
 </section>
 
 <section class="remark connective" id="s8">
 <span class="num">§8</span>
 <p class="orig" data-orig="1">让我们来看看语言（2）的一种扩展。除去“块石”“柱石”等词以外，它还包括一个词语序列，其用法就像（1）中的那个卖家对数词的使用（它可以是字母表中的字母序列），此外还有两个词，可以是“到那儿”和“这个”（因为这已经大致表明了它们的目的），与一个指示性的手部动作连在一起使用，最后是几个色样。A给出这样一种指令：“d—石板—到那儿。”同时他给助手看一个色样，并且在说“到那儿”这个词的时候指着工地上的某个地方。B说出字母表上的字母，一直说到“d”，每说一个字母，他就从放石板的地方拿出一块和色样同色的石板，并将这些石板搬到A指定的地方。——在另一些场合，A给出这样的指令：“这个—到那儿。”在说“这个”的时候，他指着一块石料，等等。</p>
+<p class="plain">给 §2 语言再加点东西：除了“块石”“柱石”，加一串像数字那样用的字母（比如 a、b、c…），加“到那儿”“这个”两个词（配手指动作），还加几张色卡。A 说“d—石板—到那儿”，同时给 B 看色卡、指一个地方；B 就念字母念到 d，每念一个搬一块同色石板，搬到指定处。换个场合 A 说“这个—到那儿”，边说“这个”边指着一块石料。</p>
 </section>
 
 <section class="remark connective" id="s9">
 <span class="num">§9</span>
 <p class="orig" data-orig="1">孩子在学习这种语言的时候，他必须记住“a、b、c……”这些“数词”的顺序。他还得学会它们的用法。——这种教学中是否也存在指物教词法呢？——好吧，人们会指着石板数着：“a、b、c块石板。”——就数词的指物教词法而言，不是用数词来数数，而是将它们当作那种一眼就可以看清的对象组的名称，那么针对数词的指物教词法和针对“块石”“柱石”的指物教词法之间的相似性就更多了。孩子们确实是这样学会前五或前六个基数词的用法的。</p>
+<p class="plain">孩子学这语言，得背下“a、b、c…”的顺序，还得学会怎么用。教数词时也用指物吗？会——指着石板数“a、b、c 块石板”。注意：这里数词不是拿来“数数”，而是被当成“一眼能看清的那组东西”的名字，这样它就跟“块石”“柱石”的教法更像了。小孩学头五六个数字，差不多就是这么学的。</p>
 <p class="orig" data-orig="1">“到那儿”和“这个”也是靠指物来教的吗？——想象一下人们是如何把它们的用法教给别人的！人们会指着地点和物品，——但是，在这里，这个“指”也出现在对词语的使用中，而不仅仅出现在对用法的学习中。</p>
+<p class="plain">“到那儿”“这个”也靠指来教吗？想想人怎么教它们——会指着地点和物品。但注意：这个“指”不只出现在“学”这两个词的时候，在“用”它们的时候也照样得指。</p>
 <p class="aside">§8–§9 把游戏一点点做复杂，逼出："d""到那儿""这个"根本不是"对象的名字"。先攒着，后面要用。</p>
 </section>
 
@@ -119,18 +145,24 @@ footer{color:var(--muted);font-size:.85rem;text-align:center;margin:30px 0 0;lin
 <span class="num">§10</span>
 <span class="move">卸掉"词标示对象" · 开篇收束</span>
 <p class="orig" data-orig="1">这种语言中的这些词语标示的是什么呢？——除了在它们的使用方式中，它们所标示的东西是什么又该如何表现出来呢？而我们已经描述了它们的使用方式。好像“这个词标示着这个”这一表达式必须成为那种描述的一部分似的。或者：好像这种描述应当被弄成“某某词标示着某某”这样的形式似的。</p>
+<p class="plain">这语言里的词到底“标示”什么？除了看它们怎么被使用，还能怎么显示出它们标示的是什么呢？而我们已经把用法描述清楚了。可我们偏好像觉得：非得在描述里补一句“这个词标示这个”才算数。</p>
 <p class="orig" data-orig="1">好吧，人们是可以说这个词标示着这个对象并以此来简化对“石板”这个词的用法的描述。如果问题仅仅在于比如要消除如下这个误解，即认为“石板”这个词所标示的是我们实际上称为“块石”的那种石料，那么人们是会这样做的，——但是，除此之外，这种“<span class="calibre3">关联</span>”的方式，即这些词的用法，是已知的。</p>
+<p class="plain">你确实可以说“‘石板’这个词标示那块石料”，用这话来简化对它用法的说明。但这只在要消除某个误会时才有用——比如有人以为“石板”指的是我们叫“块石”的那种石料。除此之外，这种“对应关系”（也就是它的用法）本来就已经是已知的了。</p>
 <p class="orig" data-orig="1">人们同样可以说“a”“b”等符号标示的是数，倘若这样说消除了以为“a”“b”“c”在语言中扮演了“块石”“石板”“柱石”实际上扮演的角色这一误解的话。人们也可以说“c”标示的是这个数而不是那个数，倘若借此能解释这些字母是以a、b、c、d这样的顺序而不是a、b、d、c这样的顺序被使用的话。</p>
+<p class="plain">同样，可以说“a”“b”标示数，只要这能消除“以为 a、b、c 在语言里扮演了块石、石板那种角色”的误会；也可以说“c 标示的是这个数而不是那个数”，只要借此能解释这些字母为什么按 a、b、c、d 而不是 a、b、d、c 的顺序来用。</p>
 <p class="orig" data-orig="1">这样一来，对词语的用法的描述是彼此相似了，但是词语的用法却不会变得相似起来！因为，正如我们所见到的，它们是完全不一样的。</p>
+<p class="plain">结果是：这些词用法的“描述”听起来彼此相似了，但词的“用法”本身并没有跟着变相似——正如前面所见，它们其实完全不一样。</p>
 <p class="setup">▷ 他又一次问"这些词标示什么"。把这一节结尾和 <b>§1 结尾</b>那句叠在一起看——绕了一圈，他落在哪？</p>
 <div class="reveal"><button>开篇十节，收在这里 ▽</button><div class="confirm">"标示／代表"这套说法<b>几乎不干活</b>，唯一用处是消除某个具体误会。真正的内容是<b>用法</b>——而用法，哪怕描述长得一样，本身可以完全不同。开篇十节到此收口。</div></div>
 </section>
-
-<hr class="div">
-<footer>到这里，"词=对象的名字"已经被松动。<br>下一个战场在 <b>§43</b>——"一个词的意义就是它在语言中的使用"。<br>那句话是炸弹，也是一场至今没停的解读之争。
-<div class="tip">（正文逐字取自规范化原文；设问自己先想，确认点开再看。）</div>
-<div class="lossnote">本页正文经程序校验：§1–§10 与规范化原文逐字一致，标注仅为附加层。</div>
-</footer></div>
+<hr class="div"><footer>到这里，"词=对象的名字"已经被松动。<br>下一个战场在 <b>§43</b>——"一个词的意义就是它在语言中的使用"。<br>那句话是炸弹，也是一场至今没停的解读之争。
+<div class="tip">（正文逐字取自规范化原文；白话与思辨标注均为附加层。）</div>
+<div class="lossnote">本页正文经程序校验：§1–§10 与规范化原文逐字一致。</div></footer></div>
 <script>
-document.querySelectorAll('.reveal>button').forEach(function(b){b.addEventListener('click',function(){var x=b.parentElement;x.classList.toggle('open');b.textContent=x.classList.contains('open')?b.textContent.replace('▽','△'):b.textContent.replace('△','▽');});});
+var b=document.body,t=document.getElementById('pt');
+function sync(){t.textContent='白话辅助 '+(b.classList.contains('show-plain')?'开':'关');}
+try{if(localStorage.getItem('zxplain')==='1')b.classList.add('show-plain');}catch(e){}
+sync();
+t.addEventListener('click',function(){b.classList.toggle('show-plain');try{localStorage.setItem('zxplain',b.classList.contains('show-plain')?'1':'0');}catch(e){}sync();});
+document.querySelectorAll('.reveal>button').forEach(function(x){x.addEventListener('click',function(){var p=x.parentElement;p.classList.toggle('open');x.textContent=p.classList.contains('open')?x.textContent.replace('▽','△'):x.textContent.replace('△','▽');});});
 </script></body></html>
