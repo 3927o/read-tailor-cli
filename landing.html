@@ -1,340 +1,241 @@
 <!DOCTYPE html>
-<html lang="zh">
-<head>
+<html lang="zh"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ReadTailor · 裁读 — 难的书，也能读得进去</title>
-<meta name="description" content="ReadTailor 把任何一本难书，按你的目标与强度，重建成一套带你读的版本——原文一字不改，导读活在页边。">
-<meta property="og:title" content="ReadTailor · 裁读 — 难的书，也能读得进去">
-<meta property="og:description" content="把任何一本难书重建成带你读的版本，导读活在页边，原文逐字不改。">
+<title>ReadTailor · 裁读 — 难的书，我陪你读完</title>
+<meta name="description" content="ReadTailor 把任何一本难书，按你的目标和强度，变成一套有人陪着读的版本：读前给地图，难处递一句，卡住了随时能问。原文一字不改。">
+<meta property="og:title" content="ReadTailor · 裁读 — 难的书，我陪你读完">
+<meta property="og:description" content="难的书，我陪你读完。读前给地图，难处递一句，卡住了随时能问；原文一字不改。">
+<meta property="og:type" content="website">
 <style>
 :root{
-  --paper:#f4f0e6; --paper2:#ece5d4; --ink:#211c14; --ink2:#4a4233;
-  --mn:#6f5340; --red:#a23a22; --rule:#d7ccb6; --rule2:#c3b69c;
+  --bg:#fbfaf7; --bg2:#f3f1ea; --ink:#211f19; --ink2:#4b463b; --soft:#7a7568;
+  --author:#1d1b16; --guide:#3c6a55; --guide-deep:#315843; --guide-bg:#eef3ef;
+  --hair:#e6e1d6; --hair2:#d8d2c4;
   --serif:"Songti SC","Noto Serif CJK SC","Source Han Serif SC","SimSun",Georgia,serif;
-  --label:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Noto Sans Mono CJK SC",monospace;
+  --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Noto Sans Mono CJK SC",monospace;
 }
 @media(prefers-color-scheme:dark){:root{
-  --paper:#16120b; --paper2:#1e190f; --ink:#e9e1cf; --ink2:#b8ad96;
-  --mn:#bd9476; --red:#dc7d5e; --rule:#352c1d; --rule2:#473b27;
+  --bg:#111210; --bg2:#181a16; --ink:#e9e6dc; --ink2:#bdb8ab; --soft:#979285;
+  --author:#ece9df; --guide:#90c2a8; --guide-deep:#a7d2bb; --guide-bg:#18211b;
+  --hair:#2a2c25; --hair2:#363830;
 }}
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{background:var(--paper);color:var(--ink);font-family:var(--serif);
-  font-size:19px;line-height:1.9;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-a{color:inherit}
-.label{font-family:var(--label);letter-spacing:.14em;text-transform:uppercase;font-size:.7rem}
-.page{max-width:1000px;margin:0 auto;padding:0 30px}
+body{background:var(--bg);color:var(--ink);font-family:var(--serif);font-size:19px;line-height:1.95;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.w{max-width:640px;margin:0 auto;padding:0 26px}
+.mono{font-family:var(--mono)}
 
-/* running head */
-.runhead{position:sticky;top:0;z-index:30;background:var(--paper);border-bottom:1px solid var(--ink)}
-.runhead .row{display:flex;justify-content:space-between;align-items:center;height:46px}
-.runhead .l{font-family:var(--label);letter-spacing:.2em;font-size:.74rem;font-weight:700}
-.runhead .r{font-family:var(--label);letter-spacing:.12em;font-size:.66rem;color:var(--mn)}
+/* header */
+header.site{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:saturate(150%) blur(10px);border-bottom:1px solid var(--hair)}
+header.site .w{display:flex;justify-content:space-between;align-items:center;height:58px;max-width:1040px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:-.01em}
+.brand .m{width:24px;height:24px;border-radius:6px;background:var(--guide);position:relative;flex:none}
+.brand .m::after{content:"";position:absolute;left:6px;right:6px;top:9px;height:2px;border-radius:1px;background:var(--bg);box-shadow:0 5px 0 color-mix(in srgb,var(--bg) 70%,transparent)}
+.brand small{font:500 .68rem/1 var(--mono);color:var(--soft);letter-spacing:.1em;margin-left:1px}
+.nav-cta{font:700 .82rem/1 var(--serif);color:var(--guide-deep);border:1px solid var(--guide);border-radius:9px;padding:8px 14px;text-decoration:none;transition:.15s}
+.nav-cta:hover{background:var(--guide);color:var(--bg)}
 
-/* leaf = one text+margin row */
-.leaf{display:grid;grid-template-columns:minmax(0,1fr) 14.5rem;column-gap:2.6rem;align-items:start}
-.leaf+.leaf{margin-top:0}
-.mn{font-size:.8rem;line-height:1.62;color:var(--mn);padding-top:.55rem;position:relative}
-.mn .fn{color:var(--red);font-family:var(--label);font-size:.62rem;margin-right:.45em;vertical-align:.15em}
-sup.fn{color:var(--red);font-family:var(--label);font-size:.58em;font-weight:700;vertical-align:super;padding:0 .12em;cursor:help}
+/* shared voice bits */
+.say{display:flex;gap:12px;align-items:flex-start}
+.say .who{font:700 .58rem/1.7 var(--mono);letter-spacing:.14em;color:var(--guide);white-space:nowrap;padding-top:.5em;opacity:.9}
+.say .txt{color:var(--guide-deep)}
+.g-lead{font-size:1.08rem;line-height:1.78;color:var(--guide-deep)}
+.g-big{font-size:1.5rem;line-height:1.5;font-weight:700;color:var(--guide-deep);letter-spacing:-.01em}
 
-/* folio / section marker */
-.folio{display:flex;align-items:baseline;gap:1rem;margin:0 0 1.6rem}
-.folio .rn{font-family:var(--label);font-size:1.05rem;font-weight:700;color:var(--red);letter-spacing:.05em}
-.folio .lbl{font-family:var(--label);letter-spacing:.18em;text-transform:uppercase;font-size:.78rem;color:var(--ink2);white-space:nowrap}
-.folio .rule{flex:1;height:0;border-bottom:1px solid var(--ink)}
+/* hero */
+.hero{padding:70px 0 18px}
+.eyebrow{display:inline-block;font:700 .7rem/1 var(--mono);letter-spacing:.18em;color:var(--soft);margin-bottom:24px}
+h1{font-size:clamp(2.1rem,6.2vw,3rem);line-height:1.2;font-weight:850;color:var(--ink);letter-spacing:-.015em}
+h1 em{font-style:normal;color:var(--guide-deep)}
+.deck{margin-top:22px}
+.cta-row{margin-top:30px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.btn{font:700 .96rem/1 var(--serif);border-radius:11px;padding:13px 22px;cursor:pointer;text-decoration:none;display:inline-block;border:0;transition:.16s}
+.btn-p{background:var(--guide);color:var(--bg)}
+.btn-p:hover{background:var(--guide-deep)}
+.btn-g{color:var(--guide-deep);border:1px solid var(--hair2)}
+.btn-g:hover{border-color:var(--guide)}
+.assure{margin-top:18px;font:.78rem/1.6 var(--mono);color:var(--soft);letter-spacing:.02em}
 
-section{padding:54px 0}
+/* sections */
+section{padding:44px 0;border-top:1px solid var(--hair)}
+.beat{font:700 .64rem/1 var(--mono);letter-spacing:.16em;color:var(--soft);text-transform:uppercase;margin-bottom:18px}
 
-/* TITLE / hero */
-.title-wrap{padding:64px 0 30px}
-.kick{color:var(--red);margin-bottom:26px}
-h1{font-size:clamp(2.6rem,7vw,4.4rem);line-height:1.04;font-weight:800;letter-spacing:-.01em}
-.deck{font-size:1.2rem;font-style:italic;color:var(--ink2);margin:22px 0 0;max-width:30em;line-height:1.62}
-.lede{margin-top:38px}
-.lede p{margin:0;text-indent:0}
-.lede p+p{margin-top:1.1em}
-.lede .first::first-letter{float:left;font-size:3.6em;line-height:.82;font-weight:800;padding:.06em .1em 0 0;color:var(--red)}
-.cta-inline{margin-top:30px;font-family:var(--label);font-size:.84rem;letter-spacing:.04em}
-.cta-inline a{color:var(--red);text-decoration:none;border-bottom:1.5px solid var(--red);padding-bottom:1px}
-.cta-inline a:hover{background:var(--red);color:var(--paper)}
-.cta-inline .sep{color:var(--rule2);margin:0 .8em}
+/* four things */
+.items{margin-top:18px}
+.items .it{padding:15px 0;border-top:1px solid var(--hair);display:flex;gap:14px}
+.items .it:last-child{border-bottom:1px solid var(--hair)}
+.items .when{font:700 .66rem/1.9 var(--mono);letter-spacing:.04em;color:var(--guide);white-space:nowrap;flex:none;width:4.4em}
+.items .it b{color:var(--ink);font-weight:800}
+.items .it .d{color:var(--soft);font-size:.92rem;display:block;line-height:1.6}
 
-/* generic prose */
-h2{font-size:1.9rem;font-weight:800;line-height:1.2;letter-spacing:-.01em;max-width:18em}
-.prose{margin-top:1.1em;max-width:34em}
-.prose p+p{margin-top:1em}
+/* sample */
+.dial{display:flex;gap:.7em;align-items:center;font:.66rem/1 var(--mono);letter-spacing:.05em;color:var(--soft);margin:8px 0 8px}
+.dial button{font:inherit;background:none;border:0;color:var(--soft);cursor:pointer;border-bottom:1.5px solid transparent;padding:3px 0}
+.dial button.on{color:var(--guide-deep);border-bottom-color:var(--guide);font-weight:700}
+.sample-frame{background:var(--bg2);border:1px solid var(--hair);border-radius:14px;padding:22px 24px;margin-top:6px}
+.sample-frame .rh{font:.6rem/1 var(--mono);letter-spacing:.1em;color:var(--soft);border-bottom:1px solid var(--hair);padding-bottom:9px;margin-bottom:12px;display:flex;justify-content:space-between}
+.author p{color:var(--author);margin:.95em 0;cursor:default}
+.author p:first-of-type{margin-top:0}
+.guide{margin:.95em 0 .95em 1.2em;padding:2px 0 2px 14px;border-left:2px solid var(--guide);color:var(--guide-deep);font-size:.92rem;line-height:1.74}
+.guide .who{font:700 .56rem/1 var(--mono);letter-spacing:.12em;display:block;margin-bottom:5px;opacity:.9}
+.lean{margin:.5em 0 .5em 1.2em;background:var(--guide-bg);border-left:2px solid var(--guide);color:var(--guide-deep);font-size:.9rem;line-height:1.7;max-height:0;overflow:hidden;padding:0 14px;transition:max-height .26s ease,padding .26s ease}
+.lean.in{max-height:280px;padding:11px 14px}
+.lean .who{font:700 .54rem/1 var(--mono);letter-spacing:.12em;display:block;margin-bottom:5px;opacity:.9}
+.hint{margin-top:14px;font:.62rem/1.7 var(--mono);color:var(--soft)}
 
-/* TOC-style genre list */
-.toc{margin-top:8px}
-.toc .leaf{padding:16px 0;border-top:1px solid var(--rule)}
-.toc .leaf:last-child{border-bottom:1px solid var(--rule)}
-.toc .tline{display:flex;align-items:baseline;gap:.7em}
-.toc .g{font-weight:800;font-size:1.18rem;white-space:nowrap}
-.toc .books{font-style:italic;color:var(--ink2);font-size:1rem;white-space:nowrap}
-.toc .ldr{flex:1;border-bottom:1px dotted var(--rule2);position:relative;top:-.3em;min-width:1.4em}
-
-/* capability entries (定义表) */
-.entry{padding:20px 0;border-top:1px solid var(--rule)}
-.entry:last-of-type{border-bottom:1px solid var(--rule)}
-.entry .term{font-family:var(--label);letter-spacing:.1em;font-size:.72rem;color:var(--red);text-transform:uppercase}
-.entry h3{font-size:1.28rem;font-weight:800;margin:3px 0 5px}
-.entry p{max-width:34em;color:var(--ink2)}
-.lv{display:flex;gap:0;margin-top:12px;font-family:var(--label);font-size:.72rem;border:1px solid var(--rule2);width:max-content}
-.lv span{padding:5px 13px;border-right:1px solid var(--rule2)}
-.lv span:last-child{border-right:0}
-.lv span.a{background:var(--red);color:var(--paper);border-color:var(--red)}
+/* genres */
+.glist{margin-top:8px}
+.glist .row{padding:11px 0;border-top:1px solid var(--hair)}
+.glist .row:last-child{border-bottom:1px solid var(--hair)}
+.glist b{color:var(--ink);font-weight:800;font-size:1.04rem}
+.glist .x{color:var(--soft);font-size:.9rem;display:block;line-height:1.55;margin-top:1px}
 
 /* steps */
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:10px;border-top:1px solid var(--rule2)}
-.stp{padding:24px 22px 24px 0;border-right:1px solid var(--rule)}
-.stp:last-child{border-right:0;padding-right:0}
-.stp .n{font-family:var(--label);font-size:2.1rem;font-weight:700;color:var(--red);line-height:1}
-.stp h3{font-size:1.18rem;font-weight:800;margin:12px 0 6px}
-.stp p{font-size:.96rem;color:var(--ink2)}
+.steps{counter-reset:s;margin-top:8px}
+.steps .s{counter-increment:s;display:flex;gap:15px;padding:13px 0;border-top:1px solid var(--hair)}
+.steps .s:last-child{border-bottom:1px solid var(--hair)}
+.steps .s::before{content:counter(s);font:700 1.15rem/1.5 var(--mono);color:var(--guide);flex:none}
+.steps .s b{font-weight:800}
+.steps .s .d{color:var(--soft);font-size:.92rem;display:block;line-height:1.55}
 
-/* SAMPLE SHEET (interactive demo) */
-.sample-cap{display:block;color:var(--mn);line-height:1.6;max-width:42em;margin-bottom:14px}
-.sample{background:var(--paper2);border:1px solid var(--rule2);border-radius:3px;
-  box-shadow:0 14px 36px -26px rgba(60,45,20,.55);padding:32px 34px 28px;position:relative;max-width:46rem;margin:0 auto}
-.sheet-rh{display:flex;justify-content:space-between;font-family:var(--label);font-size:.64rem;letter-spacing:.12em;color:var(--mn);border-bottom:1px solid var(--ink);padding-bottom:8px;margin-bottom:6px}
-.strength{display:flex;align-items:center;gap:.7em;font-family:var(--label);font-size:.68rem;letter-spacing:.1em;color:var(--mn);margin:14px 0 18px}
-.strength b{color:var(--ink)}
-.strength button{font-family:var(--label);font-size:.7rem;letter-spacing:.08em;background:none;border:0;color:var(--mn);cursor:pointer;padding:2px 0;border-bottom:1.5px solid transparent}
-.strength button.on{color:var(--red);border-bottom-color:var(--red);font-weight:700}
-.strength .d{color:var(--rule2)}
-.headnote{font-style:italic;color:var(--red);font-size:.96rem;line-height:1.66;border-left:2px solid var(--red);padding:2px 0 2px 14px;margin-bottom:16px}
-.sample .body p{margin:.7em 0;line-height:2.0;cursor:default;user-select:none}
-.sample .body b{color:var(--red)}
-.decode{margin:14px 0;padding-left:14px;border-left:1px solid var(--rule2);font-size:.86rem;color:var(--mn);line-height:1.6}
-.decode .h{font-family:var(--label);font-size:.6rem;letter-spacing:.12em;color:var(--red);display:block;margin-bottom:3px}
-.decode .anc{color:var(--red);font-weight:700}
-.plain{margin-top:14px;border-top:1px solid var(--rule);padding-top:12px}
-.plain summary{font-family:var(--label);font-size:.72rem;letter-spacing:.08em;color:var(--red);cursor:pointer;list-style:none}
-.plain summary::-webkit-details-marker{display:none}
-.plain[open] summary{opacity:.55}
-.plain .pb{font-size:.88rem;line-height:1.75;color:var(--ink2);margin-top:9px}
-.sample .hint{font-family:var(--label);font-size:.62rem;letter-spacing:.06em;color:var(--mn);margin-top:18px;border-top:1px dashed var(--rule2);padding-top:10px;line-height:1.7}
-/* slips */
-.slip{position:absolute;left:6%;right:6%;bottom:18px;background:var(--paper);border:1px solid var(--ink);
-  box-shadow:5px 6px 0 -1px rgba(80,60,30,.16);padding:14px 16px;transform:rotate(-.5deg);
-  opacity:0;pointer-events:none;transition:.2s}
-.slip.show{opacity:1;pointer-events:auto}
-.slip .x{position:absolute;top:6px;right:11px;color:var(--mn);cursor:pointer;font-family:var(--label)}
-.slip .tag{font-family:var(--label);font-size:.6rem;letter-spacing:.1em;color:var(--red);display:block;margin-bottom:5px}
-.slip .q{font-weight:800;font-size:.92rem;margin-bottom:4px}
-.slip .a,.slip .note{font-size:.86rem;line-height:1.7;color:var(--ink2)}
+/* cta */
+.cta{padding:56px 0}
+.cta form{display:flex;max-width:430px;margin-top:18px;border:1px solid var(--guide);border-radius:11px;overflow:hidden}
+.cta input{flex:1;border:0;background:transparent;color:var(--ink);font:1rem/1 var(--serif);padding:14px 16px;font-family:var(--serif)}
+.cta input:focus{outline:none}
+.cta button{border:0;background:var(--guide);color:var(--bg);font:700 .82rem/1 var(--serif);padding:0 20px;cursor:pointer}
+.cta button:hover{background:var(--guide-deep)}
+.cta .small{margin-top:12px;font:.72rem/1.6 var(--mono);color:var(--soft)}
 
-/* market / why */
-.two{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--rule2);margin-top:10px}
-.two > div{padding:26px 26px 24px 0}
-.two > div:first-child{border-right:1px solid var(--rule)}
-.two > div:last-child{padding-right:0;padding-left:26px}
-.two h3{font-size:1.18rem;font-weight:800;margin-bottom:8px}
-.two p{font-size:.98rem;color:var(--ink2)}
+footer{border-top:1px solid var(--hair);background:var(--bg2)}
+footer .w{padding:30px 26px 56px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;max-width:1040px}
+footer .who-line{font:.7rem/1.8 var(--mono);color:var(--soft);letter-spacing:.02em}
 
-/* colophon CTA */
-.colo{text-align:center;padding:70px 0}
-.colo .orn{color:var(--red);font-size:1.4rem;letter-spacing:.4em;margin-bottom:18px}
-.colo h2{margin:0 auto;max-width:16em}
-.colo p{font-style:italic;color:var(--ink2);margin:16px auto 28px;max-width:30em}
-.colo form{display:flex;gap:0;max-width:430px;margin:0 auto;border:1px solid var(--ink)}
-.colo input{flex:1;padding:13px 15px;border:0;background:transparent;color:var(--ink);font-family:var(--serif);font-size:1rem}
-.colo input:focus{outline:none}
-.colo button{font-family:var(--label);letter-spacing:.1em;font-size:.78rem;font-weight:700;padding:0 20px;border:0;border-left:1px solid var(--ink);background:var(--ink);color:var(--paper);cursor:pointer}
-
-footer{border-top:3px double var(--rule2);padding:30px 0 56px}
-.cf{font-family:var(--label);font-size:.66rem;letter-spacing:.08em;color:var(--mn);line-height:1.9;text-align:center}
-.cf b{color:var(--ink);letter-spacing:.2em}
-
-@media(max-width:820px){
+@media(max-width:560px){
   body{font-size:18px}
-  .leaf{grid-template-columns:1fr;row-gap:.4rem}
-  .mn{padding-top:0;border-top:0!important;border-left:2px solid var(--red);padding-left:.85rem;font-size:.82rem;margin:.3rem 0 .2rem}
-  .toc .leaf .mn,.lede .mn{margin-top:.5rem}
-  .steps,.two{grid-template-columns:1fr}
-  .stp{border-right:0;border-bottom:1px solid var(--rule);padding:18px 0}
-  .stp:last-child{border-bottom:0}
-  .two > div{border-right:0!important;border-bottom:1px solid var(--rule);padding:20px 0!important}
-  .two > div:last-child{border-bottom:0}
-  .sample{padding:24px 20px}
-  h2{font-size:1.55rem}
+  .hero{padding:50px 0 12px}
+  .items .it{flex-direction:column;gap:3px}
+  .items .when{width:auto}
 }
-</style>
-</head>
-<body>
+</style></head><body>
 
-<div class="runhead"><div class="page row" style="display:flex;justify-content:space-between;align-items:center;height:46px">
-  <span class="l">READTAILOR · 裁读</span>
-  <span class="r">内测样张 · 难的书，也能读得进去</span>
-</div></div>
+<header class="site"><div class="w">
+  <a class="brand" href="#top"><span class="m"></span>ReadTailor <small>裁读</small></a>
+  <a class="nav-cta" href="#cta">加入候补</a>
+</div></header>
 
-<!-- TITLE -->
-<header class="page title-wrap">
-  <div class="label kick">AI 阅读体验 · 内测中</div>
-  <h1>难的书，<br>也能读得进去。</h1>
-  <p class="deck">把任何一本书，按你的目标与强度，重建成一套「带你读」的版本。原文一字不改，难处有人陪你过。</p>
+<a id="top"></a>
+<header class="hero"><div class="w">
+  <div class="eyebrow">AI 阅读体验 · 内测中</div>
+  <h1>你手里那几本读不完的书，<br><em>我陪你，把它们读完。</em></h1>
+  <div class="say deck"><span class="who">向导</span><div class="txt g-lead">我不替你读，也不把书嚼碎了喂你。我做的事很简单：读之前帮你看清地形，读到难处递上一句话，你卡住了，扭头问我就行。原文一个字不动。</div></div>
+  <div class="cta-row">
+    <a class="btn btn-p" href="#cta">让我陪你读第一本</a>
+    <a class="btn btn-g" href="#sample">先看我怎么陪读</a>
+  </div>
+  <div class="assure">原文逐字保留 · 我说的每一句都标出处、可回查 · 内测中，名额有限</div>
+</div></header>
 
-  <div class="lede leaf">
-    <div>
-      <p class="first">你买过的书里，总有几本翻了十几页就放下了。不是你不够聪明——是这些书从没为「第一次读它的人」写过：陌生的语境、不解释的术语、跳跃的论证<sup class="fn">1</sup>，一道道门槛把人挡在门外，最后只好把「读不懂」记在自己账上。</p>
-      <p>ReadTailor 把这件事反过来。它读前给你一张地图，读中在难处递上一句话，卡住了随时能问——而正文<sup class="fn">2</sup>，逐字保留，连原书的注都原样留着。</p>
-      <div class="cta-inline"><a href="#waitlist">加入候补名单 →</a><span class="sep">·</span><a href="#sample">先看一页试读 ↓</a></div>
+<section><div class="w">
+  <div class="beat">我知道你为什么放下它们</div>
+  <div class="say"><span class="who">向导</span><div class="txt g-big">不是你不够聪明。是这些书默认你已经懂了很多——陌生的语境、不解释的术语、跳着走的论证，一道道门槛把你挡在外头，最后你把「读不懂」记在了自己账上。</div></div>
+</div></section>
+
+<section><div class="w">
+  <div class="beat">我会陪你做四件事</div>
+  <div class="say"><span class="who">向导</span><div class="txt g-lead">我在这四个时刻出现——而且我话的多少，你说了算。</div></div>
+  <div class="items">
+    <div class="it"><span class="when">读之前</span><div><b>先给你一张地图</b><span class="d">这本书要去哪、哪几段最陡、该怎么走。心里有底再进场。</span></div></div>
+    <div class="it"><span class="when">读之中</span><div><b>难处递一句</b><span class="d">这一章在做什么、这个意象在说什么；真卡住了，我再把逻辑摊开讲一遍。</span></div></div>
+    <div class="it"><span class="when">任何时候</span><div><b>长按一句就能叫我</b><span class="d">我已经知道你读到哪、前面讲了什么——不用你解释上下文，直接问。</span></div></div>
+    <div class="it"><span class="when">始终</span><div><b>话多话少你定，原文不动</b><span class="d">我只在原文旁边说，从不改你正在读的那一个字；引用的字句都校验真实存在。</span></div></div>
+  </div>
+</div></section>
+
+<section id="sample"><div class="w">
+  <div class="beat">看我怎么陪你读</div>
+  <div class="say"><span class="who">向导</span><div class="txt g-lead">我们走到《查拉图斯特拉》第三部最深的一章——「康复者」。他要正面咽下一个一直噎着他的念头。我陪你慢慢看。</div></div>
+  <div class="dial"><span>向导话多少 ›</span><button data-lv="1">少</button><button data-lv="2" class="on">适中</button><button data-lv="3">多陪我</button></div>
+  <div class="sample-frame">
+    <div class="rh"><span>查拉图斯特拉如是说 · 第三部</span><span>康复者</span></div>
+    <div class="author">
+      <p data-lean="「召唤」一个念头，是把它请到台前正面看它——他不再躲了。">起来吧，深邃的思想，从我的深处起来！</p>
+      <div class="guide gd-mid"><span class="who">向导</span>「深邃的思想」是他给「永恒轮回」起的私下称呼。先记着这个词，等下他要跟它正面交手。</div>
+      <p data-lean="一连三个「辩护人」，重音落在最后一个：他要替这念头说话，而不是忍受它。">我，查拉图斯特拉，生命的辩护人、痛苦的辩护人、循环的辩护人——我召唤你，我的最深渊的思想！</p>
+      <div class="guide gd-heavy"><span class="who">向导</span>这里是全章转折。最噎人的不是痛苦要重来，而是连那些渺小、平庸的人和事也要原封不动永远回来。他能不能对这个也说「好，再来一次」——这一章就赌在这上面。</div>
+      <p data-lean="「深渊在说话」：他不再压着它了，让它整个浮出来——这正是「康复」的开始。">好啊！它来了——我听见了！我的深渊在说话，我把我最后的深处翻到光天化日之下了！</p>
     </div>
-    <aside class="mn">
-      <p><span class="fn">1</span>问题从不在读者。门槛是这些书本身的——它们默认你已经懂了很多。</p>
-      <p style="margin-top:.8em"><span class="fn">2</span>所有标注只是<b style="color:var(--red)">叠加层</b>：正文与原书逐字一致，AI 引用的字句都校验过真实存在。</p>
-    </aside>
+    <div class="hint">长按任意一句（电脑按住约 0.5 秒 / 右键），我会凑过来对这句说一句；再点一下我退回去。</div>
   </div>
-</header>
+</div></section>
 
-<!-- SAMPLE -->
-<section class="page" id="sample">
-  <div class="folio"><span class="rn">壹</span><span class="lbl">试读样张</span><span class="rule"></span></div>
-  <p class="sample-cap label" style="text-transform:none;letter-spacing:0;font-size:.92rem">模拟演示 · 翻开公认最难的一章。原文逐字在中间，导读活在四周；「强度」决定页边注的密度与深度，正文始终不动。</p>
-      <div class="sample">
-        <div class="sheet-rh"><span>查拉图斯特拉如是说 · 第三部</span><span>康复者 · 第 62 页</span></div>
-        <div class="strength">
-          <b>批校强度</b>
-          <button data-lv="1">轻</button><span class="d">·</span>
-          <button data-lv="2" class="on">中</button><span class="d">·</span>
-          <button data-lv="3">重</button>
-        </div>
-        <div class="headnote">地标章。他主动召唤自己「最深渊的思想」，被它击倒、躺了七天像大病一场——读时留意：他病的、又挺过来的，到底是哪个念头。</div>
-        <div class="body">
-          <p data-q="他召唤的「深邃的思想」指什么？" data-a="指「永恒轮回」。这一章他不再只是抛出谜，而是正面承受它——最噎人的是连最渺小的人和事也要永远回来。">起来吧，深邃的思想<sup class="fn zy" data-note="译注：即「永恒轮回」——连最渺小、最让人厌恶的人和事，也要原封不动地永远回来。">3</sup>，从我的深处起来！</p>
-          <p data-q="「循环的辩护人」是什么意思？" data-a="他要替「永恒轮回」作证、辩护——不是被动忍受它，而是主动站出来为它说话、肯定它。">我，查拉图斯特拉，生命的辩护人、痛苦的辩护人、<b>循环的辩护人</b>——我召唤你，我的最深渊的思想！</p>
-        </div>
-        <div class="decode lv-mid">
-          <span class="h">意象解码</span>
-          <span class="anc">「循环的辩护人」</span>：他要为永恒轮回作证、辩护——不是忍受它，而是站出来替它说话。
-        </div>
-        <details class="plain lv-heavy"><summary>［ 卡住了？大白话讲一遍 ］</summary>
-          <div class="pb">一句话：他终于敢把永恒轮回完整地吞下去——包括最恶心的那部分——并且活过来、能对它说「是」。这就是「康复」。最噎人的不是痛苦要重来，而是那些渺小平庸的人和事也要永远回来；挺过这一口，他才能由衷地说「好，再来一次」。</div>
-        </details>
-        <div class="hint">模拟交互：切「轻 / 中 / 重」看页边注增减 · 点脚注号<sup style="font-family:var(--label)">3</sup>看译注 · 长按任意一句（电脑按住约 0.5 秒 / 右键）唤起情境 AI。</div>
-        <div class="slip" id="aiSlip"><span class="x" id="aiX">×</span><span class="tag">AI · 已带上下文 · 康复者</span><div class="q" id="aiQ"></div><div class="a" id="aiA"></div></div>
-        <div class="slip" id="noteSlip"><span class="x" id="noteX">×</span><span class="tag">原书译注</span><div class="note" id="noteT"></div></div>
-      </div>
-</section>
-
-<!-- GENRES -->
-<section class="page">
-  <div class="folio"><span class="rn">贰</span><span class="lbl">不挑题材</span><span class="rule"></span></div>
-  <div class="leaf"><div><h2>同一套引擎，读得懂各种难书。</h2></div>
-    <aside class="mn">不同题材卡人的地方不同，增强的重点也随之不同。</aside></div>
-  <div class="toc">
-    <div class="leaf"><div class="tline"><span class="g">哲学</span><span class="ldr"></span><span class="books">查拉图斯特拉如是说 · 哲学研究</span></div>
-      <aside class="mn">重在概念解码、论证骨架、把密集意象点破。</aside></div>
-    <div class="leaf"><div class="tline"><span class="g">历史</span><span class="ldr"></span><span class="books">中国历代政治得失 · 显微镜下的大明</span></div>
-      <aside class="mn">重在时间线、人物关系、制度与事件的脉络。</aside></div>
-    <div class="leaf"><div class="tline"><span class="g">社科 / 经济</span><span class="ldr"></span><span class="books">置身事内</span></div>
-      <aside class="mn">重在论点骨架、术语解释、与现实的映射。</aside></div>
-    <div class="leaf"><div class="tline"><span class="g">思想随笔</span><span class="ldr"></span><span class="books">可能性的艺术</span></div>
-      <aside class="mn">重在观点提炼、跨章呼应、隐含前提点明。</aside></div>
+<section><div class="w">
+  <div class="beat">不管你拿来哪种书</div>
+  <div class="say"><span class="who">向导</span><div class="txt g-lead">哲学、历史、社科、随笔我都陪得了——只是各自要看清的东西不一样。</div></div>
+  <div class="glist">
+    <div class="row"><b>哲学</b><span class="x">查拉图斯特拉 · 哲学研究——我替你盯住概念和论证骨架。</span></div>
+    <div class="row"><b>历史</b><span class="x">中国历代政治得失 · 显微镜下的大明——我替你理时间线和人物。</span></div>
+    <div class="row"><b>社科 / 经济</b><span class="x">置身事内——我替你抓核心论点。</span></div>
+    <div class="row"><b>思想随笔</b><span class="x">可能性的艺术——我替你接住跳跃的思路。</span></div>
   </div>
-</section>
+</div></section>
 
-<!-- CAPABILITIES -->
-<section class="page">
-  <div class="folio"><span class="rn">叁</span><span class="lbl">它替你做什么</span><span class="rule"></span></div>
-  <div class="leaf">
-    <div>
-      <div class="entry"><div class="term">读前</div><h3>阅读导览</h3>
-        <p>正式读之前，先给你这本书的全书地图、核心概念、该怎么读、读不懂时怎么办——心里有底再进场。</p></div>
-      <div class="entry"><div class="term">读中</div><h3>导引 · 解码 · 大白话 · 原书注</h3>
-        <p>每章一句话定位（不剧透）；不解码就读不懂的地方大白话点破；真正难啃的章节一段段讲透；原书译者注随手可点。</p></div>
-      <div class="entry"><div class="term">随时</div><h3>长按唤起情境 AI</h3>
-        <p>读到哪都能长按唤起 AI，它自动带上你当前的阅读上下文——不用解释「我读到哪、前面讲了什么」，直接问这句什么意思、他在反驳谁。</p></div>
-      <div class="entry"><div class="term">贯穿</div><h3>增强强度 · 轻 / 中 / 重</h3>
-        <p>不是越多越好。一个旋钮决定标注的密度与深度，正文体验始终由你掌控。</p>
-        <div class="lv"><span>轻 只导览导引</span><span class="a">中 ＋解码</span><span>重 ＋大白话</span></div></div>
-    </div>
-    <aside class="mn">
-      <p><span class="fn">＊</span>读前、读中、随时——一整套贴身导航，盖在一字未改的原文之上。</p>
-      <p style="margin-top:.9em">和市面的拆书/精读最大的不同：<b style="color:var(--red)">帮你读，不替原文编</b>。</p>
-    </aside>
-  </div>
-</section>
-
-<!-- HOW -->
-<section class="page">
-  <div class="folio"><span class="rn">肆</span><span class="lbl">怎么用</span><span class="rule"></span></div>
+<section><div class="w">
+  <div class="beat">你只要三件事</div>
   <div class="steps">
-    <div class="stp"><div class="n">01</div><h3>选一本书</h3><p>导入任意一本书。系统先把它拆解成干净、规范的结构。</p></div>
-    <div class="stp"><div class="n">02</div><h3>定目标与强度</h3><p>想读出什么、读到什么程度？几个问题，并选一个增强强度。</p></div>
-    <div class="stp"><div class="n">03</div><h3>开始读</h3><p>在手机上，像被一个懂行的朋友带着读。</p></div>
+    <div class="s"><div><b>挑一本书</b><span class="d">导入任意一本，我先把它拆解清楚。</span></div></div>
+    <div class="s"><div><b>告诉我你想读出什么、我话该多少</b><span class="d">几个问题，定下你的目标和我的强度。</span></div></div>
+    <div class="s"><div><b>开始读</b><span class="d">剩下的交给我——在你身边。</span></div></div>
   </div>
-</section>
+</div></section>
 
-<!-- WHY NOW -->
-<section class="page">
-  <div class="folio"><span class="rn">伍</span><span class="lbl">为什么是现在</span><span class="rule"></span></div>
-  <div class="leaf"><div><h2>AI 第一次强到能真正「读懂」一本书，并讲明白。</h2>
-    <div class="prose"><p>过去，读懂一本难书只能靠老师、读书会或运气。现在，可以把这件事规模化、个性化地交付到每个认真读者手里。</p></div></div>
-    <aside class="mn">从公认最难的几本书做起，逐步覆盖经典、严肃非虚构与专业书，最终成为认真读者的默认阅读层。</aside></div>
-  <div class="two">
-    <div><h3>需求一直在，工具一直缺</h3><p>学生、终身学习者、严肃非虚构与经典读者——海量的人有读硬书的渴望，却屡屡受挫。</p></div>
-    <div><h3>强度，是体验也是毛利杠杆</h3><p>同一本书，轻档便宜引流、重档付费深读；强度直接对应 AI 用量与单位成本，体验与经济性都有可调空间。</p></div>
-  </div>
-</section>
+<section class="cta" id="cta"><div class="w">
+  <div class="say"><span class="who">向导</span><div class="txt g-big">想让我陪你读第一本吗？</div></div>
+  <div class="say" style="margin-top:8px"><span class="who" style="visibility:hidden">向导</span><div class="txt" style="color:var(--soft);font-size:.96rem">正在内测，名额有限。留个地址，我准备好就来找你。</div></div>
+  <form onsubmit="this.querySelector('input').value='';this.querySelector('input').placeholder='好，我记下了 ✓';this.querySelector('input').blur();return false;">
+    <input type="email" placeholder="你的邮箱" required aria-label="邮箱">
+    <button type="submit">叫上向导</button>
+  </form>
+  <div class="small">我们不会拿你的地址做别的。</div>
+</div></section>
 
-<!-- COLOPHON / CTA -->
-<section class="page" id="waitlist">
-  <div class="colo">
-    <div class="orn">❧</div>
-    <h2>本书即将付印。</h2>
-    <p>我们正在内测。留下地址进候补名单，先睹为快；或直接联系我们看完整 demo 与进展。</p>
-    <form onsubmit="this.querySelector('input').value='';this.querySelector('input').placeholder='已记录（演示）';return false;">
-      <input type="email" placeholder="你的邮箱" required>
-      <button type="submit">加入候补</button>
-    </form>
-  </div>
-</section>
-
-<footer><div class="page cf">
-  <b>READTAILOR · 裁读</b><br>
-  难的书，也能读得进去　·　© 2026　·　本页为内测样张，品牌名与文案均为占位，可改
+<footer><div class="w">
+  <a class="brand" href="#top"><span class="m"></span>ReadTailor <small>裁读</small></a>
+  <div class="who-line">难的书，我陪你读完 · 原文逐字不动，向导可退场 · © 2026</div>
 </div></footer>
 
 <script>
 (function(){
-  var sample=document.querySelector('.sample');
-  // 强度
   function applyLevel(lv){
-    sample.querySelectorAll('.lv-mid').forEach(function(e){e.style.display=(lv>=2)?'':'none';});
-    sample.querySelectorAll('.lv-heavy').forEach(function(e){e.style.display=(lv>=3)?'':'none';});
+    document.querySelectorAll('.gd-mid').forEach(function(e){e.style.display=(lv>=2)?'':'none';});
+    document.querySelectorAll('.gd-heavy').forEach(function(e){e.style.display=(lv>=3)?'':'none';});
   }
-  sample.querySelectorAll('.strength button').forEach(function(b){
+  document.querySelectorAll('.dial button').forEach(function(b){
     b.addEventListener('click',function(){
-      sample.querySelectorAll('.strength button').forEach(function(o){o.classList.remove('on');});
-      b.classList.add('on'); applyLevel(parseInt(b.getAttribute('data-lv'),10));
+      document.querySelectorAll('.dial button').forEach(function(o){o.classList.remove('on');});
+      b.classList.add('on');applyLevel(+b.dataset.lv);
     });
   });
   applyLevel(2);
 
-  var aiSlip=document.getElementById('aiSlip'),aiQ=document.getElementById('aiQ'),aiA=document.getElementById('aiA');
-  var noteSlip=document.getElementById('noteSlip'),noteT=document.getElementById('noteT');
-  function hideSlips(){aiSlip.classList.remove('show');noteSlip.classList.remove('show');}
-
-  // 译注
-  sample.querySelectorAll('.zy[data-note]').forEach(function(s){
-    s.addEventListener('click',function(e){e.stopPropagation();hideSlips();noteT.textContent=s.getAttribute('data-note');noteSlip.classList.add('show');});
-  });
-  // 长按唤起情境 AI
   var timer=null;
-  function openAI(p){hideSlips();aiQ.textContent=p.getAttribute('data-q')||'这句什么意思？';aiA.textContent=p.getAttribute('data-a')||'';aiSlip.classList.add('show');}
-  sample.querySelectorAll('.body p[data-a]').forEach(function(p){
-    p.addEventListener('mousedown',function(){timer=setTimeout(function(){openAI(p);},500);});
+  function lean(p){
+    var nx=p.nextElementSibling;
+    if(nx&&nx.classList.contains('lean')){nx.classList.toggle('in');return;}
+    var d=document.createElement('div');d.className='lean';
+    d.innerHTML='<span class="who">向导 · 凑过来</span>'+p.getAttribute('data-lean');
+    p.after(d);requestAnimationFrame(function(){d.classList.add('in');});
+    d.addEventListener('click',function(){d.classList.remove('in');});
+  }
+  document.querySelectorAll('.author p[data-lean]').forEach(function(p){
+    p.addEventListener('mousedown',function(){timer=setTimeout(function(){lean(p);},500);});
     ['mouseup','mouseleave'].forEach(function(ev){p.addEventListener(ev,function(){clearTimeout(timer);});});
-    p.addEventListener('touchstart',function(){timer=setTimeout(function(){openAI(p);},500);},{passive:true});
+    p.addEventListener('touchstart',function(){timer=setTimeout(function(){lean(p);},500);},{passive:true});
     p.addEventListener('touchend',function(){clearTimeout(timer);});
-    p.addEventListener('contextmenu',function(e){e.preventDefault();openAI(p);});
+    p.addEventListener('contextmenu',function(e){e.preventDefault();lean(p);});
   });
-  document.getElementById('aiX').addEventListener('click',function(e){e.stopPropagation();aiSlip.classList.remove('show');});
-  document.getElementById('noteX').addEventListener('click',function(e){e.stopPropagation();noteSlip.classList.remove('show');});
 })();
 </script>
-</body>
-</html>
+</body></html>
