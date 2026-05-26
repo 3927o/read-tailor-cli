@@ -263,9 +263,12 @@ def render_decode(decode, disc_text):
         gloss = (d.get("gloss") or "").strip()
         if not anchor or not gloss:
             continue
-        # 防瞎编：锚点必须逐字出现在本章正文里（忽略空白）
-        if re.sub(r"\s+", "", anchor) not in re.sub(r"\s+", "", disc_text):
-            print(f"[warn] 丢弃非逐字锚点：{anchor[:20]}…", file=sys.stderr)
+        # 防瞎编：锚点必须真实出现在本章正文里（忽略空白）。
+        # AI 常用"……"省略中段，故按省略号拆段，要求每段都逐字存在。
+        flat = re.sub(r"\s+", "", disc_text)
+        parts = [re.sub(r"\s+", "", p) for p in re.split(r"…+", anchor) if p.strip()]
+        if not parts or any(p not in flat for p in parts):
+            print(f"[warn] 丢弃非逐字锚点：{anchor[:24]}", file=sys.stderr)
             continue
         items.append(f'<li><span class="anc">「{_esc(anchor)}」</span>{gloss}</li>')
     if not items:
@@ -510,6 +513,7 @@ def main(argv):
     ap.add_argument("-o", "--out", default="查拉图斯特拉_第三部.html")
     ap.add_argument("--normalized")
     ap.add_argument("--no-ai", action="store_true")
+    ap.add_argument("--ann-json", help="直接用已有标注 JSON 渲染（跳过 AI 调用与 fallback）")
     ap.add_argument("--dump-json", help="把 AI 原始标注 JSON 存到此路径")
     args = ap.parse_args(argv[1:])
 
@@ -525,6 +529,20 @@ def main(argv):
     doc_title, epigraph, discourses = extract_part3(norm)
     print(f"[2/4] 切出第三部：{len(discourses)} 章，开篇引语 {len(epigraph)} 段",
           file=sys.stderr)
+
+    if args.ann_json:
+        ann = json.load(open(args.ann_json, encoding="utf-8"))
+        source = "ai(json)"
+        print(f"[3/4] 标注来源：{source}（{args.ann_json}）", file=sys.stderr)
+        html_out, lossless = render_html(doc_title, epigraph, discourses, ann)
+        if not lossless:
+            print("[FATAL] 正文未通过无损校验，拒绝输出。", file=sys.stderr)
+            return 1
+        with open(args.out, "w", encoding="utf-8") as f:
+            f.write(html_out)
+        print(f"[4/4] 无损校验通过；写出 {len(html_out)} 字节 -> {args.out}（{source}）",
+              file=sys.stderr)
+        return 0
 
     ann = None if args.no_ai else ai_annotate(discourses)
     source = "ai"
