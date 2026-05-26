@@ -1,77 +1,149 @@
 <!DOCTYPE html>
 <html lang="zh"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>立场 B · 同行的向导</title>
+<title>立场 B · 同行的向导 — ReadTailor</title>
 <style>
-:root{--bg:#fbfaf7;--ink:#23211c;--soft:#6e6a60;--author:#1f1d18;--guide:#3f6b57;--guide-bg:#eef3ee;--line:#e8e4da;--hair:#d9d4c8}
-@media(prefers-color-scheme:dark){:root{--bg:#121310;--ink:#e8e5db;--soft:#9a958a;--author:#ece9df;--guide:#8fc0a6;--guide-bg:#19211b;--line:#2a2c25;--hair:#33352d}}
+:root{--bg:#fbfaf7;--ink:#23211c;--soft:#6e6a60;--author:#1f1d18;--guide:#3f6b57;--guide-bg:#eef3ee;--hair:#e3ded3}
+@media(prefers-color-scheme:dark){:root{--bg:#121310;--ink:#e8e5db;--soft:#9a958a;--author:#ece9df;--guide:#8fc0a6;--guide-bg:#19211b;--hair:#2c2e27}}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--ink);font:19px/1.95 "Songti SC","Noto Serif CJK SC","Source Han Serif SC",Georgia,serif}
 .mono{font-family:ui-monospace,Menlo,Consolas,"Noto Sans Mono CJK SC",monospace}
-.stance{border-bottom:1px solid var(--hair)}
-.stance .w{max-width:600px;margin:0 auto;padding:12px 24px;display:flex;justify-content:space-between;align-items:baseline;gap:18px}
-.stance .id{font:700 .72rem/1 ui-monospace,monospace;letter-spacing:.2em}
-.stance .wv{font-size:.8rem;color:var(--soft);font-style:italic}
-.read{max-width:600px;margin:0 auto;padding:46px 24px 120px}
+.w{max-width:620px;margin:0 auto;padding:0 26px}
+.stance{border-bottom:1px solid var(--hair);position:sticky;top:0;background:var(--bg);z-index:20}
+.stance .w{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:9px 26px}
+.stance .id{font:700 .7rem/1 ui-monospace,monospace;letter-spacing:.2em}
+.stance .wv{font-size:.78rem;color:var(--soft);font-style:italic}
 
-/* "we are here" — the companion's opening, conversational */
-.together{display:flex;gap:12px;align-items:flex-start;margin-bottom:34px}
-.together .who{font:.64rem/1.5 ui-monospace,monospace;letter-spacing:.1em;color:var(--guide);white-space:nowrap;padding-top:.35em}
-.together .say{color:var(--guide);font-size:.96rem;line-height:1.7}
+/* the guide's voice is the through-line */
+.say{display:flex;gap:12px;align-items:flex-start}
+.say .who{font:.6rem/1.6 ui-monospace,monospace;letter-spacing:.12em;color:var(--guide);white-space:nowrap;padding-top:.5em;opacity:.85}
+.say .txt{color:var(--guide)}
+.g-big{font-size:1.55rem;line-height:1.5;font-weight:700;color:var(--guide)}
+.g-lead{font-size:1.05rem;line-height:1.8;color:var(--guide)}
 
-/* control: how talkative the guide is */
-.dial{display:flex;gap:.7em;align-items:center;font:.66rem/1 ui-monospace,monospace;letter-spacing:.06em;color:var(--soft);margin-bottom:30px}
+header.hero{padding:64px 0 30px}
+header .pre{font:.66rem/1 ui-monospace,monospace;letter-spacing:.2em;color:var(--soft);margin-bottom:26px}
+header h1{font-size:clamp(2rem,6vw,2.9rem);line-height:1.22;font-weight:800;color:var(--ink);letter-spacing:-.01em}
+header h1 em{font-style:normal;color:var(--guide)}
+header .deck{margin-top:20px}
+.cta-inline{margin-top:28px;font:.84rem/1 ui-monospace,monospace}
+.cta-inline a{color:var(--guide);border-bottom:1.5px solid var(--guide);padding-bottom:1px;text-decoration:none}
+.cta-inline a:hover{background:var(--guide);color:var(--bg)}
+.cta-inline .sep{color:var(--hair);margin:0 .8em}
+
+section{padding:40px 0;border-top:1px solid var(--hair)}
+.beat{font:.62rem/1 ui-monospace,monospace;letter-spacing:.16em;color:var(--soft);margin-bottom:18px;text-transform:uppercase}
+
+/* guide describing, with small inset items */
+.items{margin-top:18px}
+.items .it{padding:13px 0;border-top:1px solid var(--hair)}
+.items .it:last-child{border-bottom:1px solid var(--hair)}
+.items .it b{color:var(--ink);font-weight:800}
+.items .it span{color:var(--soft);font-size:.92rem}
+.dial{display:flex;gap:.7em;align-items:center;font:.66rem/1 ui-monospace,monospace;letter-spacing:.06em;color:var(--soft);margin:22px 0 4px}
 .dial button{font:inherit;background:none;border:0;color:var(--soft);cursor:pointer;border-bottom:1.5px solid transparent;padding:3px 0}
 .dial button.on{color:var(--guide);border-bottom-color:var(--guide);font-weight:700}
 
-/* author's voice = the text */
+/* the reading sample: two voices */
+.together{margin:6px 0 22px}
 .author p{color:var(--author);margin:1.05em 0;cursor:default}
-.author p:first-child{margin-top:0}
+.guide{margin:1.05em 0 1.05em 1.3em;padding:2px 0 2px 15px;border-left:2px solid var(--guide);color:var(--guide);font-size:.92rem;line-height:1.74}
+.guide .who{font:700 .58rem/1 ui-monospace,monospace;letter-spacing:.12em;display:block;margin-bottom:5px;opacity:.85}
+.lean{margin:.5em 0 .5em 1.3em;padding:0 15px;background:var(--guide-bg);border-left:2px solid var(--guide);color:var(--guide);font-size:.9rem;line-height:1.7;max-height:0;overflow:hidden;transition:.24s}
+.lean.in{max-height:260px;padding:11px 15px}
+.lean .who{font:700 .56rem/1 ui-monospace,monospace;letter-spacing:.12em;display:block;margin-bottom:5px;opacity:.85}
+.hint{margin-top:18px;font:.62rem/1.8 ui-monospace,monospace;color:var(--soft)}
 
-/* guide's voice = a second speaker, lighter, set in */
-.guide{margin:1.1em 0 1.1em 1.4em;padding:2px 0 2px 16px;border-left:2px solid var(--guide);color:var(--guide);font-size:.92rem;line-height:1.74}
-.guide .who{font:700 .6rem/1 ui-monospace,monospace;letter-spacing:.12em;display:block;margin-bottom:5px;opacity:.85}
+/* genres as spoken list */
+.glist{margin-top:14px;font-size:1.02rem;line-height:2.1}
+.glist b{color:var(--ink)}
+.glist .x{color:var(--soft);font-size:.9rem}
 
-/* summoned aside (long-press) — guide leans in, then recedes */
-.lean{margin:.6em 0 .6em 1.4em;padding:10px 16px;background:var(--guide-bg);border-left:2px solid var(--guide);color:var(--guide);font-size:.9rem;line-height:1.7;
-  max-height:0;overflow:hidden;padding-top:0;padding-bottom:0;transition:.24s}
-.lean.in{max-height:240px;padding-top:11px;padding-bottom:11px}
-.lean .who{font:700 .58rem/1 ui-monospace,monospace;letter-spacing:.12em;display:block;margin-bottom:5px;opacity:.85}
-.hint{margin-top:60px;border-top:1px solid var(--hair);padding-top:14px;font:.64rem/1.8 ui-monospace,monospace;color:var(--soft);letter-spacing:.04em}
-footer{max-width:600px;margin:0 auto;padding:0 24px 60px;font:.64rem/1.8 ui-monospace,monospace;color:var(--soft);text-align:center}
+/* steps spoken */
+.steps{counter-reset:s;margin-top:10px}
+.steps .s{counter-increment:s;display:flex;gap:14px;padding:12px 0;border-top:1px solid var(--hair)}
+.steps .s::before{content:counter(s);font:700 1.1rem/1.4 ui-monospace,monospace;color:var(--guide)}
+.steps .s b{font-weight:800}
+.steps .s span{color:var(--soft);font-size:.92rem;display:block}
+
+/* cta */
+.cta{padding:52px 0 16px}
+.cta form{display:flex;max-width:420px;margin:18px 0 0;border:1px solid var(--guide)}
+.cta input{flex:1;border:0;background:transparent;color:var(--ink);font:1rem/1 inherit;padding:13px 15px;font-family:inherit}
+.cta input:focus{outline:none}
+.cta button{border:0;border-left:1px solid var(--guide);background:var(--guide);color:var(--bg);font:700 .76rem/1 ui-monospace,monospace;letter-spacing:.08em;padding:0 18px;cursor:pointer}
+footer{border-top:1px solid var(--hair)}
+footer .w{padding:24px 26px 56px;font:.62rem/1.8 ui-monospace,monospace;color:var(--soft);text-align:center}
 </style></head><body>
 
-<div class="stance"><div class="w"><span class="id">立场 B · 同行的向导 / VOICE BESIDE YOU</span><span class="wv">页上有两个声音；向导只在有用时开口，从不覆写作者。</span></div></div>
+<div class="stance"><div class="w"><span class="id">立场 B · 同行的向导 / VOICE BESIDE YOU</span><span class="wv">整页是向导在跟你说话；它只在有用时开口，从不覆写作者。</span></div></div>
 
-<main class="read">
-  <div class="together">
-    <span class="who">向导</span>
-    <div class="say">我们走到第三部最深的一章了——「康复者」。这一章他要正面咽下一个一直噎着他的念头。我陪你慢慢看，卡住了就拍我一下。</div>
+<header class="hero"><div class="w">
+  <div class="pre">READTAILOR · 裁读</div>
+  <h1>你手里那几本读不完的书——<br><em>我陪你，把它们读完。</em></h1>
+  <div class="say deck"><span class="who">向导</span><div class="txt g-lead">我不替你读，也不把书嚼碎了喂你。我做的事很简单：读之前帮你看清地形，读到难处递上一句话，你卡住了，扭头问我就行。原文一个字不动。</div></div>
+  <div class="cta-inline"><a href="#cta">让我陪你读第一本 →</a><span class="sep">·</span><a href="#sample">先看我怎么陪读 ↓</a></div>
+</div></header>
+
+<section><div class="w">
+  <div class="beat">我知道你为什么放下它们</div>
+  <div class="say"><span class="who">向导</span><div class="txt g-big">不是你不够聪明。是这些书默认你已经懂了很多——陌生的语境、不解释的术语、跳着走的论证，一道道门槛把你挡在外头，最后你把「读不懂」记在了自己账上。</div></div>
+</div></section>
+
+<section><div class="w">
+  <div class="beat">我会陪你做四件事</div>
+  <div class="say"><span class="who">向导</span><div class="txt g-lead">具体说，我在这四个时刻出现——你可以调我话的多少：</div></div>
+  <div class="items">
+    <div class="it"><b>读之前</b>，我先给你这本书的地图：它要去哪、哪几段最陡、该怎么走。<span></span></div>
+    <div class="it"><b>读之中</b>，难处我递一句：这章在做什么、这个意象在说什么；真卡住了，我再把逻辑摊开讲一遍。<span></span></div>
+    <div class="it"><b>任何时候</b>，你长按一句话就能叫我——我已经知道你读到哪、前面讲了什么，不用你解释。<span></span></div>
+    <div class="it"><b>始终</b>，我话多话少你说了算；而且我只在原文旁边说，从不改你正在读的那一个字。<span></span></div>
   </div>
+</div></section>
 
-  <div class="dial">
-    <span>向导话多少 ›</span>
-    <button data-lv="1">少</button>
-    <button data-lv="2" class="on">适中</button>
-    <button data-lv="3">多陪我</button>
-  </div>
-
+<section id="sample"><div class="w">
+  <div class="beat">看我怎么陪你读 · 模拟演示</div>
+  <div class="say together"><span class="who">向导</span><div class="txt g-lead">我们走到第三部最深的一章了——「康复者」。这一章他要正面咽下一个一直噎着他的念头。我陪你慢慢看，卡住了就拍我一下（长按某句）。</div></div>
+  <div class="dial"><span>向导话多少 ›</span><button data-lv="1">少</button><button data-lv="2" class="on">适中</button><button data-lv="3">多陪我</button></div>
   <div class="author">
-    <p data-lean="起来「召唤」一个念头，是把它请到台前、正面看它——他不再躲了。">起来吧，深邃的思想，从我的深处起来！</p>
-
+    <p data-lean="「召唤」一个念头，是把它请到台前正面看它——他不再躲了。">起来吧，深邃的思想，从我的深处起来！</p>
     <div class="guide gd-mid"><span class="who">向导</span>「深邃的思想」是他给「永恒轮回」起的私下称呼。先记着这个词，等下他要跟它正面交手。</div>
-
     <p data-lean="一连三个「辩护人」，重音落在最后一个：他要替这念头说话，而不是忍受它。">我，查拉图斯特拉，生命的辩护人、痛苦的辩护人、循环的辩护人——我召唤你，我的最深渊的思想！</p>
-
-    <div class="guide gd-heavy"><span class="who">向导</span>这里是全章的转折。最噎人的不是痛苦要重来，而是连那些渺小、平庸的人和事也要原封不动永远回来。他能不能对这个也说「好，再来一次」——这一章就赌在这上面。</div>
-
+    <div class="guide gd-heavy"><span class="who">向导</span>这里是全章转折。最噎人的不是痛苦要重来，而是连那些渺小、平庸的人和事也要原封不动永远回来。他能不能对这个也说「好，再来一次」——这一章就赌在这上面。</div>
     <p data-lean="「深渊在说话」：他不再压着它了，让它整个浮出来——这正是「康复」的开始。">好啊！它来了——我听见了！我的深渊在说话，我把我最后的深处翻到光天化日之下了！</p>
   </div>
+  <div class="hint">长按任意一句（电脑按住约 0.5 秒 / 右键），我会凑过来对这句说一句；再点一下我退回去。</div>
+</div></section>
 
-  <div class="hint">模拟交互：长按任意一句（电脑按住约 0.5 秒 / 右键），向导会凑过来对这句说一句，再点一下让他退回去。切「向导话多少」看他出声的频次。</div>
-</main>
+<section><div class="w">
+  <div class="beat">不管你拿来哪种书</div>
+  <div class="say"><span class="who">向导</span><div class="txt g-lead">哲学、历史、社科、随笔我都陪得了——只是各自要看清的东西不一样：</div></div>
+  <div class="glist">
+    <div><b>哲学</b>　<span class="x">查拉图斯特拉 · 哲学研究——我替你盯概念和论证骨架。</span></div>
+    <div><b>历史</b>　<span class="x">中国历代政治得失 · 显微镜下的大明——我替你理时间线和人物。</span></div>
+    <div><b>社科 / 经济</b>　<span class="x">置身事内——我替你抓核心论点。</span></div>
+    <div><b>思想随笔</b>　<span class="x">可能性的艺术——我替你接住跳跃的思路。</span></div>
+  </div>
+</div></section>
 
-<footer>正文为作者的声音，逐字不动 · 绿色是向导的声音，可退场 · 立场原型，仅示组织原则</footer>
+<section><div class="w">
+  <div class="beat">你只要三件事</div>
+  <div class="steps">
+    <div class="s"><div><b>挑一本书</b><span>导入任意一本，我先把它拆解清楚。</span></div></div>
+    <div class="s"><div><b>告诉我你想读出什么、我话该多少</b><span>几个问题，定下你的目标和我的强度。</span></div></div>
+    <div class="s"><div><b>开始读</b><span>剩下的交给我——在你身边。</span></div></div>
+  </div>
+</div></section>
+
+<section class="cta" id="cta"><div class="w">
+  <div class="say"><span class="who">向导</span><div class="txt g-big">想让我陪你读第一本吗？</div></div>
+  <div class="say" style="margin-top:10px"><span class="who" style="opacity:0">向导</span><div class="txt" style="color:var(--soft);font-size:.95rem">正在内测。留个地址，我准备好就来找你。</div></div>
+  <form onsubmit="this.querySelector('input').value='';this.querySelector('input').placeholder='好，我记下了（演示）';return false;">
+    <input type="email" placeholder="你的邮箱" required><button type="submit">叫上向导</button>
+  </form>
+</div></section>
+
+<footer><div class="w">READTAILOR · 裁读　正文是作者的声音，逐字不动 · 绿色是向导的声音，可退场 · © 2026 · 立场原型，文案为占位</div></footer>
 
 <script>
 (function(){
@@ -80,14 +152,9 @@ footer{max-width:600px;margin:0 auto;padding:0 24px 60px;font:.64rem/1.8 ui-mono
     document.querySelectorAll('.gd-heavy').forEach(function(e){e.style.display=(lv>=3)?'':'none';});
   }
   document.querySelectorAll('.dial button').forEach(function(b){
-    b.addEventListener('click',function(){
-      document.querySelectorAll('.dial button').forEach(function(o){o.classList.remove('on');});
-      b.classList.add('on');applyLevel(+b.dataset.lv);
-    });
+    b.addEventListener('click',function(){document.querySelectorAll('.dial button').forEach(function(o){o.classList.remove('on');});b.classList.add('on');applyLevel(+b.dataset.lv);});
   });
   applyLevel(2);
-
-  // 长按 = 拍向导的肩，他凑过来；再点一下退回去
   var timer=null;
   function lean(p){
     var nx=p.nextElementSibling;
