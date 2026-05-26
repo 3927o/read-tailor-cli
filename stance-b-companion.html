@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>立场 B · 同行的向导</title>
+<style>
+:root{--bg:#fbfaf7;--ink:#23211c;--soft:#6e6a60;--author:#1f1d18;--guide:#3f6b57;--guide-bg:#eef3ee;--line:#e8e4da;--hair:#d9d4c8}
+@media(prefers-color-scheme:dark){:root{--bg:#121310;--ink:#e8e5db;--soft:#9a958a;--author:#ece9df;--guide:#8fc0a6;--guide-bg:#19211b;--line:#2a2c25;--hair:#33352d}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:19px/1.95 "Songti SC","Noto Serif CJK SC","Source Han Serif SC",Georgia,serif}
+.mono{font-family:ui-monospace,Menlo,Consolas,"Noto Sans Mono CJK SC",monospace}
+.stance{border-bottom:1px solid var(--hair)}
+.stance .w{max-width:600px;margin:0 auto;padding:12px 24px;display:flex;justify-content:space-between;align-items:baseline;gap:18px}
+.stance .id{font:700 .72rem/1 ui-monospace,monospace;letter-spacing:.2em}
+.stance .wv{font-size:.8rem;color:var(--soft);font-style:italic}
+.read{max-width:600px;margin:0 auto;padding:46px 24px 120px}
+
+/* "we are here" — the companion's opening, conversational */
+.together{display:flex;gap:12px;align-items:flex-start;margin-bottom:34px}
+.together .who{font:.64rem/1.5 ui-monospace,monospace;letter-spacing:.1em;color:var(--guide);white-space:nowrap;padding-top:.35em}
+.together .say{color:var(--guide);font-size:.96rem;line-height:1.7}
+
+/* control: how talkative the guide is */
+.dial{display:flex;gap:.7em;align-items:center;font:.66rem/1 ui-monospace,monospace;letter-spacing:.06em;color:var(--soft);margin-bottom:30px}
+.dial button{font:inherit;background:none;border:0;color:var(--soft);cursor:pointer;border-bottom:1.5px solid transparent;padding:3px 0}
+.dial button.on{color:var(--guide);border-bottom-color:var(--guide);font-weight:700}
+
+/* author's voice = the text */
+.author p{color:var(--author);margin:1.05em 0;cursor:default}
+.author p:first-child{margin-top:0}
+
+/* guide's voice = a second speaker, lighter, set in */
+.guide{margin:1.1em 0 1.1em 1.4em;padding:2px 0 2px 16px;border-left:2px solid var(--guide);color:var(--guide);font-size:.92rem;line-height:1.74}
+.guide .who{font:700 .6rem/1 ui-monospace,monospace;letter-spacing:.12em;display:block;margin-bottom:5px;opacity:.85}
+
+/* summoned aside (long-press) — guide leans in, then recedes */
+.lean{margin:.6em 0 .6em 1.4em;padding:10px 16px;background:var(--guide-bg);border-left:2px solid var(--guide);color:var(--guide);font-size:.9rem;line-height:1.7;
+  max-height:0;overflow:hidden;padding-top:0;padding-bottom:0;transition:.24s}
+.lean.in{max-height:240px;padding-top:11px;padding-bottom:11px}
+.lean .who{font:700 .58rem/1 ui-monospace,monospace;letter-spacing:.12em;display:block;margin-bottom:5px;opacity:.85}
+.hint{margin-top:60px;border-top:1px solid var(--hair);padding-top:14px;font:.64rem/1.8 ui-monospace,monospace;color:var(--soft);letter-spacing:.04em}
+footer{max-width:600px;margin:0 auto;padding:0 24px 60px;font:.64rem/1.8 ui-monospace,monospace;color:var(--soft);text-align:center}
+</style></head><body>
+
+<div class="stance"><div class="w"><span class="id">立场 B · 同行的向导 / VOICE BESIDE YOU</span><span class="wv">页上有两个声音；向导只在有用时开口，从不覆写作者。</span></div></div>
+
+<main class="read">
+  <div class="together">
+    <span class="who">向导</span>
+    <div class="say">我们走到第三部最深的一章了——「康复者」。这一章他要正面咽下一个一直噎着他的念头。我陪你慢慢看，卡住了就拍我一下。</div>
+  </div>
+
+  <div class="dial">
+    <span>向导话多少 ›</span>
+    <button data-lv="1">少</button>
+    <button data-lv="2" class="on">适中</button>
+    <button data-lv="3">多陪我</button>
+  </div>
+
+  <div class="author">
+    <p data-lean="起来「召唤」一个念头，是把它请到台前、正面看它——他不再躲了。">起来吧，深邃的思想，从我的深处起来！</p>
+
+    <div class="guide gd-mid"><span class="who">向导</span>「深邃的思想」是他给「永恒轮回」起的私下称呼。先记着这个词，等下他要跟它正面交手。</div>
+
+    <p data-lean="一连三个「辩护人」，重音落在最后一个：他要替这念头说话，而不是忍受它。">我，查拉图斯特拉，生命的辩护人、痛苦的辩护人、循环的辩护人——我召唤你，我的最深渊的思想！</p>
+
+    <div class="guide gd-heavy"><span class="who">向导</span>这里是全章的转折。最噎人的不是痛苦要重来，而是连那些渺小、平庸的人和事也要原封不动永远回来。他能不能对这个也说「好，再来一次」——这一章就赌在这上面。</div>
+
+    <p data-lean="「深渊在说话」：他不再压着它了，让它整个浮出来——这正是「康复」的开始。">好啊！它来了——我听见了！我的深渊在说话，我把我最后的深处翻到光天化日之下了！</p>
+  </div>
+
+  <div class="hint">模拟交互：长按任意一句（电脑按住约 0.5 秒 / 右键），向导会凑过来对这句说一句，再点一下让他退回去。切「向导话多少」看他出声的频次。</div>
+</main>
+
+<footer>正文为作者的声音，逐字不动 · 绿色是向导的声音，可退场 · 立场原型，仅示组织原则</footer>
+
+<script>
+(function(){
+  function applyLevel(lv){
+    document.querySelectorAll('.gd-mid').forEach(function(e){e.style.display=(lv>=2)?'':'none';});
+    document.querySelectorAll('.gd-heavy').forEach(function(e){e.style.display=(lv>=3)?'':'none';});
+  }
+  document.querySelectorAll('.dial button').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.querySelectorAll('.dial button').forEach(function(o){o.classList.remove('on');});
+      b.classList.add('on');applyLevel(+b.dataset.lv);
+    });
+  });
+  applyLevel(2);
+
+  // 长按 = 拍向导的肩，他凑过来；再点一下退回去
+  var timer=null;
+  function lean(p){
+    var nx=p.nextElementSibling;
+    if(nx&&nx.classList.contains('lean')){nx.classList.toggle('in');return;}
+    var d=document.createElement('div');d.className='lean';
+    d.innerHTML='<span class="who">向导 · 凑过来</span>'+p.dataset.lean;
+    p.after(d);requestAnimationFrame(function(){d.classList.add('in');});
+    d.addEventListener('click',function(){d.classList.remove('in');});
+  }
+  document.querySelectorAll('.author p[data-lean]').forEach(function(p){
+    p.addEventListener('mousedown',function(){timer=setTimeout(function(){lean(p);},500);});
+    ['mouseup','mouseleave'].forEach(function(ev){p.addEventListener(ev,function(){clearTimeout(timer);});});
+    p.addEventListener('touchstart',function(){timer=setTimeout(function(){lean(p);},500);},{passive:true});
+    p.addEventListener('touchend',function(){clearTimeout(timer);});
+    p.addEventListener('contextmenu',function(e){e.preventDefault();lean(p);});
+  });
+})();
+</script>
+</body></html>

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>立场 C · 地形与攀登</title>
+<style>
+:root{--bg:#f3f1ea;--ink:#1e1b15;--soft:#7d7568;--rule:#d3c9b4;--trail:#b9ad92;--here:#9a4f24;--pass:#9a4f24;--done:#a9a08b;--ahead:#c8bfa9;--panel:#fbfaf5}
+@media(prefers-color-scheme:dark){:root{--bg:#13110c;--ink:#e8e1d0;--soft:#968d7c;--rule:#332c1f;--trail:#4a4131;--here:#dc8a54;--pass:#dc8a54;--done:#5f5747;--ahead:#3d3526;--panel:#1b1810}
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:18px/1.85 "Songti SC","Noto Serif CJK SC","Source Han Serif SC",Georgia,serif}
+.mono{font-family:ui-monospace,Menlo,Consolas,"Noto Sans Mono CJK SC",monospace}
+.stance{border-bottom:1px solid var(--rule)}
+.stance .w{max-width:980px;margin:0 auto;padding:12px 26px;display:flex;justify-content:space-between;align-items:baseline;gap:18px}
+.stance .id{font:700 .72rem/1 ui-monospace,monospace;letter-spacing:.2em}
+.stance .wv{font-size:.8rem;color:var(--soft);font-style:italic}
+
+.layout{max-width:980px;margin:0 auto;padding:30px 26px 90px;display:grid;grid-template-columns:228px 1fr;gap:46px;align-items:start}
+
+/* the route / trail = primary frame */
+.route{position:sticky;top:18px}
+.route .cap{font:.62rem/1.4 ui-monospace,monospace;letter-spacing:.14em;color:var(--soft);margin-bottom:14px}
+.trail{list-style:none;position:relative;margin-left:8px;border-left:2px solid var(--trail)}
+.trail li{position:relative;padding:0 0 4px 20px;min-height:30px}
+.trail li .dot{position:absolute;left:-7px;top:5px;width:12px;height:12px;border-radius:50%;background:var(--bg);border:2px solid var(--trail)}
+.trail li.done .dot{background:var(--done);border-color:var(--done)}
+.trail li.pass .dot{border-color:var(--pass);box-shadow:0 0 0 3px rgba(154,79,36,.18)}
+.trail li.here .dot{background:var(--here);border-color:var(--here);box-shadow:0 0 0 4px rgba(154,79,36,.22)}
+.trail li .nm{font-size:.82rem;color:var(--soft);cursor:pointer;line-height:1.4;display:inline-block}
+.trail li.done .nm{color:var(--done)}
+.trail li.here .nm{color:var(--here);font-weight:800}
+.trail li.pass .nm{color:var(--ink)}
+.trail li .tagp{font:.56rem/1 ui-monospace,monospace;letter-spacing:.08em;color:var(--pass);margin-left:6px;border:1px solid var(--pass);border-radius:2px;padding:1px 4px}
+.trail li.veil .nm{color:var(--ahead);font-style:italic}
+.legend{margin-top:16px;font:.58rem/1.9 ui-monospace,monospace;color:var(--soft);letter-spacing:.04em}
+.legend b{color:var(--here)}
+
+/* the stretch you're on */
+.stretch .pos{font:.64rem/1.4 ui-monospace,monospace;letter-spacing:.12em;color:var(--here);margin-bottom:6px}
+.stretch h1{font-size:1.7rem;font-weight:800;letter-spacing:.02em;margin-bottom:4px}
+.stretch .alt{font:.64rem/1.6 ui-monospace,monospace;color:var(--soft);letter-spacing:.06em;margin-bottom:20px}
+.orient{background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--here);padding:14px 16px;font-size:.92rem;line-height:1.7;color:var(--ink);margin-bottom:8px}
+.orient .l{font:.58rem/1 ui-monospace,monospace;letter-spacing:.12em;color:var(--here);display:block;margin-bottom:6px}
+.marks{display:flex;gap:.7em;align-items:center;font:.64rem/1 ui-monospace,monospace;letter-spacing:.06em;color:var(--soft);margin:20px 0}
+.marks button{font:inherit;background:none;border:0;color:var(--soft);cursor:pointer;border-bottom:1.5px solid transparent;padding:3px 0}
+.marks button.on{color:var(--here);border-bottom-color:var(--here);font-weight:700}
+.body p{margin:1em 0}
+.trailmark{margin:1em 0;padding-left:14px;border-left:1px dashed var(--here);font-size:.86rem;line-height:1.6;color:var(--soft)}
+.trailmark b{color:var(--here)}
+.summit{margin-top:30px;border-top:1px dashed var(--rule);padding-top:14px;font:.66rem/1.7 ui-monospace,monospace;color:var(--soft);letter-spacing:.04em}
+.hint{margin-top:30px;font:.62rem/1.8 ui-monospace,monospace;color:var(--soft);letter-spacing:.04em}
+footer{max-width:980px;margin:0 auto;padding:0 26px 60px;font:.62rem/1.8 ui-monospace,monospace;color:var(--soft);text-align:center}
+@media(max-width:760px){.layout{grid-template-columns:1fr;gap:26px}.route{position:static}}
+</style></head><body>
+
+<div class="stance"><div class="w"><span class="id">立场 C · 地形与攀登 / THE TERRAIN</span><span class="wv">读一本难书是穿越地形；你始终看得见整条路与自己的位置。</span></div></div>
+
+<main class="layout">
+  <!-- 路线：主框架 -->
+  <nav class="route">
+    <div class="cap">第三部 · 全程 16 程</div>
+    <ul class="trail">
+      <li class="done"><span class="dot"></span><span class="nm">01 浪游者</span></li>
+      <li class="done pass"><span class="dot"></span><span class="nm">02 幻影和谜</span><span class="tagp">隘</span></li>
+      <li class="done"><span class="dot"></span><span class="nm">03 违背意愿的幸福</span></li>
+      <li class="done"><span class="dot"></span><span class="nm">…（07–10）</span></li>
+      <li class="done pass"><span class="dot"></span><span class="nm">11 重压之魔</span><span class="tagp">隘</span></li>
+      <li class="done"><span class="dot"></span><span class="nm">12 古老的法版…</span></li>
+      <li class="here pass"><span class="dot"></span><span class="nm">13 康复者</span><span class="tagp">隘</span></li>
+      <li><span class="dot"></span><span class="nm">14 伟大的渴望</span></li>
+      <li><span class="dot"></span><span class="nm">15 另一曲舞蹈之歌</span></li>
+      <li class="veil pass"><span class="dot"></span><span class="nm">16 ？？？ 山顶（先不剧透）</span></li>
+    </ul>
+    <div class="legend"><b>●你在这</b> · ◎隘口=难章 · ●已走过 · ○前方</div>
+  </nav>
+
+  <!-- 你脚下这一程 -->
+  <section class="stretch">
+    <div class="pos">第 13 程 / 共 16 · 已走过 12 程 · 前方还有 3 程到顶</div>
+    <h1>康复者</h1>
+    <div class="alt">地形：第三部最深的一道隘口 · 海拔：全书最低谷，也是回升的起点</div>
+
+    <div class="orient"><span class="l">进隘口前先看路</span>这一程他主动召唤自己「最深渊的思想」，被它击倒、躺了七天像大病一场。留意：他病的、又挺过来的，到底是哪个念头——这道隘口过了，后面就是回升。<b style="color:var(--here)">山顶不剧透。</b></div>
+
+    <div class="marks"><span>路标密度 ›</span><button data-lv="1">疏</button><button data-lv="2" class="on">适中</button><button data-lv="3">密</button></div>
+
+    <div class="body">
+      <p>起来吧，深邃的思想，从我的深处起来！</p>
+      <div class="trailmark tm-mid"><b>路标</b>「深邃的思想」＝他给「永恒轮回」起的名字。这道隘口的全部重量都压在这个念头上。</div>
+      <p>我，查拉图斯特拉，生命的辩护人、痛苦的辩护人、循环的辩护人——我召唤你，我的最深渊的思想！</p>
+      <div class="trailmark tm-heavy"><b>险点</b>最噎人的一口：连最渺小、平庸的人和事也要永远回来。能对这个也说「好，再来一次」，才算翻过这道隘口。</div>
+      <p>好啊！它来了——我听见了！我的深渊在说话，我把我最后的深处翻到光天化日之下了！</p>
+    </div>
+
+    <div class="summit">回望：你已翻过 02 幻影和谜、11 重压之魔两道隘口 · 此程过后地势回升，14–15 是缓坡，16 是山顶。</div>
+    <div class="hint">模拟交互：点左侧路线上的任一程可跳转定位 · 切「路标密度」调整途中提示的多少 · 山顶（16）保持遮蔽，不提前剧透。</div>
+  </section>
+</main>
+
+<footer>正文逐字不动 · 路线/海拔/隘口为附加的方位层 · 立场原型，仅示组织原则</footer>
+
+<script>
+(function(){
+  function applyLevel(lv){
+    document.querySelectorAll('.tm-mid').forEach(function(e){e.style.display=(lv>=2)?'':'none';});
+    document.querySelectorAll('.tm-heavy').forEach(function(e){e.style.display=(lv>=3)?'':'none';});
+  }
+  document.querySelectorAll('.marks button').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.querySelectorAll('.marks button').forEach(function(o){o.classList.remove('on');});
+      b.classList.add('on');applyLevel(+b.dataset.lv);
+    });
+  });
+  applyLevel(2);
+  // 点路线上的程 → 定位（演示：高亮为“你在这”）
+  document.querySelectorAll('.trail li .nm').forEach(function(nm){
+    nm.addEventListener('click',function(){
+      var li=nm.closest('li');
+      if(li.classList.contains('veil'))return; // 山顶不可剧透/进入
+      document.querySelectorAll('.trail li').forEach(function(x){x.classList.remove('here');});
+      li.classList.add('here');
+      document.querySelector('.stretch h1').textContent=nm.textContent.replace(/^[0-9…]+\s*/,'');
+      document.querySelector('.stretch .pos').textContent='已定位到：'+nm.textContent+'（演示：正文与路标随程更新）';
+    });
+  });
+})();
+</script>
+</body></html>

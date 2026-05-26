@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>立场 A · 集注本</title>
+<style>
+:root{--paper:#f5f2ea;--ink:#1c1814;--ink2:#4d4537;--faint:#8a8170;--rule:#cabd9f;--mark:#8a3b1e;--sig:#6b6250}
+@media(prefers-color-scheme:dark){:root{--paper:#14110b;--ink:#e7dfcd;--ink2:#b3a88f;--faint:#8f856f;--rule:#3a3122;--mark:#d98a5e;--sig:#9a8f76}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font:18px/1.85 "Songti SC","Noto Serif CJK SC","Source Han Serif SC",Georgia,serif}
+.mono{font-family:ui-monospace,Menlo,Consolas,"Noto Sans Mono CJK SC",monospace}
+.stance{border-bottom:1px solid var(--ink);padding:10px 0}
+.stance .w{max-width:760px;margin:0 auto;padding:0 26px;display:flex;justify-content:space-between;align-items:baseline;gap:18px}
+.stance .id{font:700 .72rem/1 ui-monospace,monospace;letter-spacing:.22em}
+.stance .wv{font-size:.8rem;color:var(--faint);font-style:italic}
+.edition{max-width:760px;margin:0 auto;padding:40px 26px 90px}
+.masthead{text-align:center;border-bottom:3px double var(--rule);padding-bottom:18px;margin-bottom:6px}
+.masthead .t{font-size:1.5rem;font-weight:800;letter-spacing:.04em}
+.masthead .sub{font-size:.76rem;color:var(--faint);letter-spacing:.16em;margin-top:6px}
+.runhead{display:flex;justify-content:space-between;font:.66rem/1 ui-monospace,monospace;letter-spacing:.14em;color:var(--faint);padding:8px 0;border-bottom:1px solid var(--rule)}
+.apparatus-ctl{display:flex;gap:.6em;align-items:center;font:.68rem/1 ui-monospace,monospace;letter-spacing:.08em;color:var(--faint);margin:16px 0 22px}
+.apparatus-ctl button{font:inherit;background:none;border:0;color:var(--faint);cursor:pointer;padding:3px 0;border-bottom:1.5px solid transparent}
+.apparatus-ctl button.on{color:var(--mark);border-bottom-color:var(--mark);font-weight:700}
+.headnote{font-style:italic;color:var(--ink2);font-size:.92rem;border-left:2px solid var(--rule);padding-left:14px;margin:0 0 24px}
+
+/* text spine with line gutter + margin apparatus */
+.spread{display:grid;grid-template-columns:2.2rem minmax(0,1fr) 12.5rem;column-gap:1.4rem}
+.line{display:contents}
+.ln{grid-column:1;text-align:right;font:.62rem/2.3 ui-monospace,monospace;color:var(--faint);user-select:none}
+.tx{grid-column:2;text-align:justify;text-justify:inter-character;line-height:2.3}
+.mg{grid-column:3;font-size:.74rem;line-height:1.55;color:var(--ink2);padding-top:.35rem}
+.mg .sig{color:var(--mark)}
+.sig{font:700 .6em/1 ui-monospace,monospace;color:var(--mark);vertical-align:super;cursor:pointer}
+.tx .lemma{border-bottom:1px dotted var(--mark);cursor:pointer}
+mark.hot{background:rgba(138,59,30,.16);color:inherit}
+
+/* apparatus band (footnotes) */
+.band{margin-top:34px;border-top:1px solid var(--ink);padding-top:14px}
+.band .bh{font:.62rem/1 ui-monospace,monospace;letter-spacing:.16em;color:var(--faint);margin-bottom:10px}
+.app{display:grid;grid-template-columns:1.6rem 1fr;gap:.2rem .7rem;font-size:.84rem;line-height:1.6;padding:5px 0;border-bottom:1px dotted var(--rule)}
+.app .k{font:700 .72rem/1.7 ui-monospace,monospace;color:var(--mark)}
+.app .lem{font-weight:800}.app .lem::after{content:" ]";color:var(--faint);font-weight:400}
+.app .src{font:.6rem/1 ui-monospace,monospace;color:var(--sig);letter-spacing:.08em;margin-left:.5em}
+.app.flash{background:rgba(138,59,30,.1)}
+.hidden{display:none}
+footer{max-width:760px;margin:0 auto;padding:0 26px 60px;font:.64rem/1.8 ui-monospace,monospace;color:var(--faint);text-align:center;letter-spacing:.06em}
+@media(max-width:680px){.spread{grid-template-columns:1.6rem 1fr}.mg{grid-column:2;border-left:2px solid var(--rule);padding:.2rem 0 .4rem .7rem;margin:.1rem 0 .5rem}}
+</style></head><body>
+
+<div class="stance"><div class="w"><span class="id">立场 A · 集注本 / CRITICAL EDITION</span><span class="wv">原典不可动，帮助是依附其上、可溯源的注疏层。</span></div></div>
+
+<main class="edition">
+  <div class="masthead"><div class="t">查拉图斯特拉如是说</div><div class="sub">第三部 · 康复者 · 集注本</div></div>
+  <div class="runhead"><span>FRIEDRICH NIETZSCHE</span><span>正文逐字 · 注疏分层可溯源</span></div>
+
+  <div class="apparatus-ctl">
+    <span>层级 ›</span>
+    <button data-lv="1">正文＋译注</button>
+    <button data-lv="2" class="on">＋导读边注</button>
+    <button data-lv="3">＋校勘大白话</button>
+  </div>
+
+  <p class="headnote">地标章。他主动召唤自己「最深渊的思想」，被它击倒、躺了七天像大病一场——他病的、又挺过来的，到底是哪个念头？</p>
+
+  <div class="spread">
+    <div class="line"><span class="ln">1</span>
+      <div class="tx">起来吧，<span class="lemma" data-app="a">深邃的思想</span><span class="sig" data-app="a">a</span>，从我的深处起来！</div>
+      <div class="mg lv2">　</div></div>
+
+    <div class="line"><span class="ln">2</span>
+      <div class="tx">我，查拉图斯特拉，生命的辩护人、痛苦的辩护人、<span class="lemma" data-app="b">循环的辩护人</span><span class="sig" data-app="b">b</span>——我召唤你，我的最深渊的思想！</div>
+      <div class="mg lv2"><span class="sig">b</span> 导读：他要替这念头<b>作证、辩护</b>，不是忍受，是站出来肯定它。</div></div>
+
+    <div class="line"><span class="ln">3</span>
+      <div class="tx">好啊！它来了——我听见了！我的深渊在说话，我把我最后的深处翻到光天化日之下了！</div>
+      <div class="mg lv2">　</div></div>
+  </div>
+
+  <div class="band">
+    <div class="bh">校勘与注 · APPARATUS</div>
+    <div class="app" id="app-a"><span class="k">1ᵃ</span><div><span class="lem">深邃的思想</span>即「永恒轮回」——连最渺小、最让人厌恶的人和事，也要原封不动地永远回来。<span class="src">〔译注·原书〕</span></div></div>
+    <div class="app" id="app-b"><span class="k">2ᵇ</span><div><span class="lem">循环的辩护人</span>他要为「永恒轮回」作证、辩护——不是被动忍受它，而是主动站出来为它说话、肯定它。<span class="src">〔导读·AI〕</span></div></div>
+    <div class="app lv3"><span class="k">＊</span><div><span class="lem">全章大白话</span>他终于敢把永恒轮回完整地吞下去——包括最恶心的那部分——并且活过来、能对它说「是」。这就是「康复」。<span class="src">〔导读·AI〕</span></div></div>
+  </div>
+</main>
+
+<footer>正文与规范化原文逐字一致 · 每条注皆标出处 · 〔译注〕原书 · 〔导读〕AI · 立场原型，仅示组织原则</footer>
+
+<script>
+(function(){
+  function applyLevel(lv){
+    document.querySelectorAll('.lv2').forEach(function(e){e.style.visibility=(lv>=2)?'visible':'hidden';});
+    document.querySelectorAll('.lv3').forEach(function(e){e.classList.toggle('hidden',lv<3);});
+  }
+  document.querySelectorAll('.apparatus-ctl button').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.querySelectorAll('.apparatus-ctl button').forEach(function(o){o.classList.remove('on');});
+      b.classList.add('on');applyLevel(+b.dataset.lv);
+    });
+  });
+  applyLevel(2);
+  // 查阅 apparatus：点正文记号/词条 → 高亮底部对应注
+  document.querySelectorAll('[data-app]').forEach(function(el){
+    el.addEventListener('click',function(){
+      var t=document.getElementById('app-'+el.dataset.app);
+      if(!t)return;
+      document.querySelectorAll('.app').forEach(function(a){a.classList.remove('flash');});
+      t.classList.add('flash');t.scrollIntoView({behavior:'smooth',block:'center'});
+    });
+  });
+})();
+</script>
+</body></html>
