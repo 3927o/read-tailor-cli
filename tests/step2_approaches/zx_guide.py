@@ -178,7 +178,9 @@ def ai_generate_guide(digest: dict) -> dict | None:
         "节文本采样：\n" + "\n".join(digest["samples"])
     )
     try:
-        resp, tokens = call_ai(user, SYSTEM, max_tokens=8000)
+        # deepseek-v4-pro 是推理模型，会先消耗大量 reasoning token 且忽略
+        # thinking:disabled，预算给小了会全被推理吃光、content 为空，故放大。
+        resp, tokens = call_ai(user, SYSTEM, max_tokens=24000)
     except Exception as e:
         print(f"[warn] AI 调用失败，退回 fallback：{e}", file=sys.stderr)
         return None
