@@ -85,6 +85,19 @@ section{padding:44px 0;border-top:1px solid var(--hair)}
 .lean .who{font:700 .54rem/1 var(--mono);letter-spacing:.12em;display:block;margin-bottom:5px;opacity:.9}
 .hint{margin-top:14px;font:.62rem/1.7 var(--mono);color:var(--soft)}
 
+/* reading overview (导览) */
+.guide-card{background:var(--bg2);border:1px solid var(--hair);border-radius:14px;padding:6px 24px;margin-top:6px}
+.guide-card .blk{padding:14px 0;border-top:1px solid var(--hair)}
+.guide-card .blk:first-child{border-top:0}
+.guide-card .lab{font:700 .62rem/1.6 var(--mono);letter-spacing:.1em;color:var(--guide);margin-bottom:4px}
+.guide-card p{color:var(--ink2);font-size:.95rem;line-height:1.7}
+.map{list-style:none}
+.map li{display:flex;gap:10px;padding:3px 0;font-size:.93rem;color:var(--soft)}
+.map li .pt{font:700 .64rem/1.7 var(--mono);color:var(--guide);flex:none;width:3.6em}
+.map li.now{color:var(--ink)}.map li.now .pt{color:var(--guide-deep)}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+.chips span{font-size:.82rem;border:1px solid var(--hair2);border-radius:999px;padding:3px 11px;color:var(--ink2)}
+
 /* genres */
 .glist{margin-top:8px}
 .glist .row{padding:11px 0;border-top:1px solid var(--hair)}
@@ -154,8 +167,28 @@ footer .who-line{font:.7rem/1.8 var(--mono);color:var(--soft);letter-spacing:.02
   </div>
 </div></section>
 
+<section id="overview"><div class="w">
+  <div class="beat">读之前 · 阅读导览</div>
+  <div class="say"><span class="who">向导</span><div class="txt g-lead">正式翻开之前，我先带你站到高处，看一眼这本书的全貌——心里有底，比硬闯强。</div></div>
+  <div class="guide-card">
+    <div class="blk"><div class="lab">这本书在干什么</div><p>一个叫查拉图斯特拉的人下山，要把他想明白的一件事讲给世人：人怎么不靠神、靠自己，活出意义。记住——它是诗，不是论文。</p></div>
+    <div class="blk"><div class="lab">全书地图</div>
+      <ul class="map">
+        <li><span class="pt">第一部</span>立说——抛出「超人」与精神的三段变化。</li>
+        <li><span class="pt">第二部</span>交锋与自我怀疑，声音渐沉。</li>
+        <li class="now"><span class="pt">第三部</span>最深的攀登——直面「永恒轮回」，走到自我肯定。<b style="color:var(--guide-deep)">（待会儿的试读在这）</b></li>
+        <li><span class="pt">第四部</span>余响与作别。</li>
+      </ul>
+    </div>
+    <div class="blk"><div class="lab">你会反复撞见的几个词</div>
+      <div class="chips"><span>超人</span><span>永恒轮回</span><span>沉重之灵</span><span>权力意志</span><span>末人</span></div>
+    </div>
+    <div class="blk"><div class="lab">读不懂时怎么办</div><p>别求全懂。先让画面和情绪砸到你，逻辑交给我——难句长按叫我，整章卡住了我把它讲成大白话。</p></div>
+  </div>
+</div></section>
+
 <section id="sample"><div class="w">
-  <div class="beat">看我怎么陪你读</div>
+  <div class="beat">读之中 · 看我怎么陪你读</div>
   <div class="say"><span class="who">向导</span><div class="txt g-lead">我们走到《查拉图斯特拉》第三部最深的一章——「康复者」。他要正面咽下一个一直噎着他的念头。我陪你慢慢看。</div></div>
   <div class="dial"><span>向导话多少 ›</span><button data-lv="1">少</button><button data-lv="2" class="on">适中</button><button data-lv="3">多陪我</button></div>
   <div class="sample-frame">
