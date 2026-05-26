@@ -37,7 +37,6 @@ a{color:inherit}
 .leaf+.leaf{margin-top:0}
 .mn{font-size:.8rem;line-height:1.62;color:var(--mn);padding-top:.55rem;position:relative}
 .mn .fn{color:var(--red);font-family:var(--label);font-size:.62rem;margin-right:.45em;vertical-align:.15em}
-.mn.top{border-top:1px solid var(--rule)}
 sup.fn{color:var(--red);font-family:var(--label);font-size:.58em;font-weight:700;vertical-align:super;padding:0 .12em;cursor:help}
 
 /* folio / section marker */
@@ -46,9 +45,7 @@ sup.fn{color:var(--red);font-family:var(--label);font-size:.58em;font-weight:700
 .folio .lbl{font-family:var(--label);letter-spacing:.18em;text-transform:uppercase;font-size:.78rem;color:var(--ink2);white-space:nowrap}
 .folio .rule{flex:1;height:0;border-bottom:1px solid var(--ink)}
 
-section{padding:62px 0}
-.sec-rule{border:0;border-top:1px solid var(--rule2)}
-.dbl{border:0;border-top:3px double var(--rule2);margin:0}
+section{padding:54px 0}
 
 /* TITLE / hero */
 .title-wrap{padding:64px 0 30px}
@@ -73,9 +70,10 @@ h2{font-size:1.9rem;font-weight:800;line-height:1.2;letter-spacing:-.01em;max-wi
 .toc{margin-top:8px}
 .toc .leaf{padding:16px 0;border-top:1px solid var(--rule)}
 .toc .leaf:last-child{border-bottom:1px solid var(--rule)}
-.toc .g{font-weight:800;font-size:1.18rem}
-.toc .books{font-style:italic;color:var(--ink2);font-size:1rem}
-.toc .dots{display:inline-block;color:var(--rule2);letter-spacing:.2em}
+.toc .tline{display:flex;align-items:baseline;gap:.7em}
+.toc .g{font-weight:800;font-size:1.18rem;white-space:nowrap}
+.toc .books{font-style:italic;color:var(--ink2);font-size:1rem;white-space:nowrap}
+.toc .ldr{flex:1;border-bottom:1px dotted var(--rule2);position:relative;top:-.3em;min-width:1.4em}
 
 /* capability entries (定义表) */
 .entry{padding:20px 0;border-top:1px solid var(--rule)}
@@ -83,13 +81,13 @@ h2{font-size:1.9rem;font-weight:800;line-height:1.2;letter-spacing:-.01em;max-wi
 .entry .term{font-family:var(--label);letter-spacing:.1em;font-size:.72rem;color:var(--red);text-transform:uppercase}
 .entry h3{font-size:1.28rem;font-weight:800;margin:3px 0 5px}
 .entry p{max-width:34em;color:var(--ink2)}
-.lv{display:flex;gap:0;margin-top:12px;font-family:var(--label);font-size:.72rem;border:1px solid var(--ink);width:max-content}
-.lv span{padding:5px 13px;border-right:1px solid var(--ink)}
+.lv{display:flex;gap:0;margin-top:12px;font-family:var(--label);font-size:.72rem;border:1px solid var(--rule2);width:max-content}
+.lv span{padding:5px 13px;border-right:1px solid var(--rule2)}
 .lv span:last-child{border-right:0}
-.lv span.a{background:var(--ink);color:var(--paper)}
+.lv span.a{background:var(--red);color:var(--paper);border-color:var(--red)}
 
 /* steps */
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:10px;border-top:1px solid var(--ink)}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:10px;border-top:1px solid var(--rule2)}
 .stp{padding:24px 22px 24px 0;border-right:1px solid var(--rule)}
 .stp:last-child{border-right:0;padding-right:0}
 .stp .n{font-family:var(--label);font-size:2.1rem;font-weight:700;color:var(--red);line-height:1}
@@ -97,10 +95,9 @@ h2{font-size:1.9rem;font-weight:800;line-height:1.2;letter-spacing:-.01em;max-wi
 .stp p{font-size:.96rem;color:var(--ink2)}
 
 /* SAMPLE SHEET (interactive demo) */
-.sample-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
-.sample-head .bk{font-family:var(--label);letter-spacing:.12em;font-size:.72rem;color:var(--mn)}
-.sample{background:var(--paper2);border:1px solid var(--rule2);border-radius:2px;
-  box-shadow:0 1px 0 var(--rule2),14px 14px 0 -6px rgba(80,60,30,.07);padding:34px 36px 30px;position:relative}
+.sample-cap{display:block;color:var(--mn);line-height:1.6;max-width:42em;margin-bottom:14px}
+.sample{background:var(--paper2);border:1px solid var(--rule2);border-radius:3px;
+  box-shadow:0 14px 36px -26px rgba(60,45,20,.55);padding:32px 34px 28px;position:relative;max-width:46rem;margin:0 auto}
 .sheet-rh{display:flex;justify-content:space-between;font-family:var(--label);font-size:.64rem;letter-spacing:.12em;color:var(--mn);border-bottom:1px solid var(--ink);padding-bottom:8px;margin-bottom:6px}
 .strength{display:flex;align-items:center;gap:.7em;font-family:var(--label);font-size:.68rem;letter-spacing:.1em;color:var(--mn);margin:14px 0 18px}
 .strength b{color:var(--ink)}
@@ -130,7 +127,7 @@ h2{font-size:1.9rem;font-weight:800;line-height:1.2;letter-spacing:-.01em;max-wi
 .slip .a,.slip .note{font-size:.86rem;line-height:1.7;color:var(--ink2)}
 
 /* market / why */
-.two{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--ink);margin-top:10px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--rule2);margin-top:10px}
 .two > div{padding:26px 26px 24px 0}
 .two > div:first-child{border-right:1px solid var(--rule)}
 .two > div:last-child{padding-right:0;padding-left:26px}
@@ -185,21 +182,17 @@ footer{border-top:3px double var(--rule2);padding:30px 0 56px}
       <p>ReadTailor 把这件事反过来。它读前给你一张地图，读中在难处递上一句话，卡住了随时能问——而正文<sup class="fn">2</sup>，逐字保留，连原书的注都原样留着。</p>
       <div class="cta-inline"><a href="#waitlist">加入候补名单 →</a><span class="sep">·</span><a href="#sample">先看一页试读 ↓</a></div>
     </div>
-    <aside class="mn top">
+    <aside class="mn">
       <p><span class="fn">1</span>问题从不在读者。门槛是这些书本身的——它们默认你已经懂了很多。</p>
       <p style="margin-top:.8em"><span class="fn">2</span>所有标注只是<b style="color:var(--red)">叠加层</b>：正文与原书逐字一致，AI 引用的字句都校验过真实存在。</p>
     </aside>
   </div>
 </header>
 
-<hr class="dbl">
-
 <!-- SAMPLE -->
 <section class="page" id="sample">
   <div class="folio"><span class="rn">壹</span><span class="lbl">试读样张</span><span class="rule"></span></div>
-  <div class="leaf">
-    <div>
-      <div class="sample-head"><span class="bk">模拟演示 · 翻开公认最难的一章</span></div>
+  <p class="sample-cap label" style="text-transform:none;letter-spacing:0;font-size:.92rem">模拟演示 · 翻开公认最难的一章。原文逐字在中间，导读活在四周；「强度」决定页边注的密度与深度，正文始终不动。</p>
       <div class="sample">
         <div class="sheet-rh"><span>查拉图斯特拉如是说 · 第三部</span><span>康复者 · 第 62 页</span></div>
         <div class="strength">
@@ -224,15 +217,7 @@ footer{border-top:3px double var(--rule2);padding:30px 0 56px}
         <div class="slip" id="aiSlip"><span class="x" id="aiX">×</span><span class="tag">AI · 已带上下文 · 康复者</span><div class="q" id="aiQ"></div><div class="a" id="aiA"></div></div>
         <div class="slip" id="noteSlip"><span class="x" id="noteX">×</span><span class="tag">原书译注</span><div class="note" id="noteT"></div></div>
       </div>
-    </div>
-    <aside class="mn top">
-      <p>这一整张，就是 ReadTailor 读起来的样子：原文逐字在中间，导读活在四周。</p>
-      <p style="margin-top:.9em"><span class="fn">＊</span>「强度」决定页边注的密度与深度，正文始终不动——老手要清净，新手要带读。</p>
-    </aside>
-  </div>
 </section>
-
-<hr class="sec-rule">
 
 <!-- GENRES -->
 <section class="page">
@@ -240,18 +225,16 @@ footer{border-top:3px double var(--rule2);padding:30px 0 56px}
   <div class="leaf"><div><h2>同一套引擎，读得懂各种难书。</h2></div>
     <aside class="mn">不同题材卡人的地方不同，增强的重点也随之不同。</aside></div>
   <div class="toc">
-    <div class="leaf"><div><span class="g">哲学</span> <span class="dots">···········</span> <span class="books">查拉图斯特拉如是说 · 哲学研究</span></div>
+    <div class="leaf"><div class="tline"><span class="g">哲学</span><span class="ldr"></span><span class="books">查拉图斯特拉如是说 · 哲学研究</span></div>
       <aside class="mn">重在概念解码、论证骨架、把密集意象点破。</aside></div>
-    <div class="leaf"><div><span class="g">历史</span> <span class="dots">···········</span> <span class="books">中国历代政治得失 · 显微镜下的大明</span></div>
+    <div class="leaf"><div class="tline"><span class="g">历史</span><span class="ldr"></span><span class="books">中国历代政治得失 · 显微镜下的大明</span></div>
       <aside class="mn">重在时间线、人物关系、制度与事件的脉络。</aside></div>
-    <div class="leaf"><div><span class="g">社科 / 经济</span> <span class="dots">······</span> <span class="books">置身事内</span></div>
+    <div class="leaf"><div class="tline"><span class="g">社科 / 经济</span><span class="ldr"></span><span class="books">置身事内</span></div>
       <aside class="mn">重在论点骨架、术语解释、与现实的映射。</aside></div>
-    <div class="leaf"><div><span class="g">思想随笔</span> <span class="dots">········</span> <span class="books">可能性的艺术</span></div>
+    <div class="leaf"><div class="tline"><span class="g">思想随笔</span><span class="ldr"></span><span class="books">可能性的艺术</span></div>
       <aside class="mn">重在观点提炼、跨章呼应、隐含前提点明。</aside></div>
   </div>
 </section>
-
-<hr class="sec-rule">
 
 <!-- CAPABILITIES -->
 <section class="page">
@@ -275,8 +258,6 @@ footer{border-top:3px double var(--rule2);padding:30px 0 56px}
   </div>
 </section>
 
-<hr class="sec-rule">
-
 <!-- HOW -->
 <section class="page">
   <div class="folio"><span class="rn">肆</span><span class="lbl">怎么用</span><span class="rule"></span></div>
@@ -286,8 +267,6 @@ footer{border-top:3px double var(--rule2);padding:30px 0 56px}
     <div class="stp"><div class="n">03</div><h3>开始读</h3><p>在手机上，像被一个懂行的朋友带着读。</p></div>
   </div>
 </section>
-
-<hr class="sec-rule">
 
 <!-- WHY NOW -->
 <section class="page">
