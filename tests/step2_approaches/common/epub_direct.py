@@ -166,9 +166,37 @@ def _data_uri(zf: zipfile.ZipFile, path: str, all_paths: set[str]) -> str | None
     return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
 
 
+def _is_noteref_marker(img: Tag) -> bool:
+    """True if this <img> is a footnote-noteref marker icon (no content value).
+
+    EPUB conventions: such markers carry `zy-footnote` attrs (duokan/Calibre),
+    or are wrapped inside an <a epub:type="noteref">. pandoc drops these via
+    its footnote translation; we do the same so the same icon doesn't get
+    base64-embedded a thousand times.
+    """
+    if img.get("zy-footnote") or img.get("zy-footnote1"):
+        return True
+    for anc in img.parents:
+        if not isinstance(anc, Tag):
+            continue
+        if anc.name == "a" and str(anc.get("epub:type", "")).startswith("note"):
+            return True
+        if anc.name in ("body", "html"):
+            break
+    return False
+
+
 def _embed_resources(body: Tag, file_path: str, zf: zipfile.ZipFile, all_paths: set[str]) -> None:
-    """Inline every <img src> and <svg image href> as data: URIs (in place)."""
+    """Inline <img src> and <svg image href> as data: URIs (in place).
+
+    Drops EPUB footnote-noteref marker imgs (purely decorative; carry the
+    same icon thousands of times and would blow up the file). plan_7 pairs
+    notes via href, not via these markers.
+    """
     for img in body.find_all("img"):
+        if _is_noteref_marker(img):
+            img.decompose()
+            continue
         src = img.get("src")
         if not src or _DATA_OR_EXTERNAL.match(src):
             continue
