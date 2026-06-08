@@ -62,7 +62,7 @@ def run_route_1(use_ai: bool) -> str:
     print("[route 1] pandoc + epub_recover + plan_7", file=sys.stderr)
     t0 = time.time()
     raw = subprocess.run(
-        ["pandoc", EPUB, "-f", "epub", "-t", "html", "-s", "-o", "-"],
+        ["pandoc", EPUB, "-f", "epub", "-t", "html", "-s", "--embed-resources", "-o", "-"],
         capture_output=True, text=True, check=True,
     ).stdout
     print(f"  pandoc raw: {len(raw):>9} chars  ({time.time()-t0:.1f}s)", file=sys.stderr)

@@ -22,11 +22,15 @@ What this spike does:
   - keep <aside epub:type=...> notes exactly as-is (plan_7 pairs them via the
     bidirectional href invariant, which we leave intact)
 
-NOT done (deliberately, it's a spike): image/resource embedding (img tags are
-kept with their original src), EPUB2 NCX-only TOC, CSS.
+Does embed: <img src> and <svg image href> resolved against the EPUB and
+inlined as base64 data URIs (pandoc parity).
+
+NOT done (deliberately, it's a spike): EPUB2 NCX-only TOC, CSS.
 """
 from __future__ import annotations
 
+import base64
+import mimetypes
 import posixpath
 import re
 import sys
@@ -135,6 +139,55 @@ def _rewrite_href(
 
 
 # --------------------------------------------------------------------------
+# resource embedding (img src / svg image href -> data: URI)
+# --------------------------------------------------------------------------
+
+
+_DATA_OR_EXTERNAL = re.compile(r"^(data:|https?:|//)", re.I)
+
+
+def _resolve_relative(src: str, base_file: str) -> str:
+    """Resolve src relative to the EPUB-internal path of base_file."""
+    base_dir = posixpath.dirname(base_file)
+    return posixpath.normpath(posixpath.join(base_dir, src))
+
+
+def _data_uri(zf: zipfile.ZipFile, path: str, all_paths: set[str]) -> str | None:
+    """Read EPUB-internal `path`, return base64 data URI, or None if missing."""
+    if path not in all_paths:
+        return None
+    try:
+        data = zf.read(path)
+    except KeyError:
+        return None
+    mime, _ = mimetypes.guess_type(path)
+    if not mime:
+        mime = "application/octet-stream"
+    return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+
+
+def _embed_resources(body: Tag, file_path: str, zf: zipfile.ZipFile, all_paths: set[str]) -> None:
+    """Inline every <img src> and <svg image href> as data: URIs (in place)."""
+    for img in body.find_all("img"):
+        src = img.get("src")
+        if not src or _DATA_OR_EXTERNAL.match(src):
+            continue
+        target = _resolve_relative(src.split("#")[0], file_path)
+        uri = _data_uri(zf, target, all_paths)
+        if uri:
+            img["src"] = uri
+    for image in body.find_all("image"):
+        for attr in ("xlink:href", "href"):
+            href = image.get(attr)
+            if not href or _DATA_OR_EXTERNAL.match(href):
+                continue
+            target = _resolve_relative(href.split("#")[0], file_path)
+            uri = _data_uri(zf, target, all_paths)
+            if uri:
+                image[attr] = uri
+
+
+# --------------------------------------------------------------------------
 # build
 # --------------------------------------------------------------------------
 
@@ -161,6 +214,8 @@ def epub_to_html(epub_path: str) -> str:
 
             for el in body.find_all(id=True):
                 el["id"] = f"{slug}__{el.get('id')}"
+
+            _embed_resources(body, path, zf, all_paths)
 
             title = (doc.find("title").get_text(strip=True) if doc.find("title") else "")
             headings = body.find_all(HEADINGS)
