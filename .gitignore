@@ -5,7 +5,11 @@
 .env
 bookcli.toml
 __pycache__/
+# step2 generated artifacts (normalized html / structure json / ai prompts / results)
+/tests/step2_approaches/outputs/
 /tests/step2_approaches/outputs_*
+/tests/step2_approaches/legacy/outputs/
+/tests/step2_approaches/results.json
 /tests/step2_approaches/results_*.json
 
 !.env.example
