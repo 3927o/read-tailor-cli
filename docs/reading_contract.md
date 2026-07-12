@@ -1,8 +1,8 @@
 # 裁读 ReadTailor 阅读数据契约
 
-**版本**：v0.1  
-**日期**：2026-07-12  
-**关联产品文档**：[`product_mvp_plan.md`](product_mvp_plan.md)  
+**版本**：v0.2
+**日期**：2026-07-13
+**关联产品文档**：[`product_mvp_plan.md`](product_mvp_plan.md)
 **规范化契约**：[`normalized_book_spec.md`](normalized_book_spec.md)
 
 本文档定义规范化书籍如何进入阅读器、节点内容生成、精确裁读注、用户划线和问 AI。
@@ -19,6 +19,10 @@
 - 图片及其他必要资源
 - 规范化与校验报告
 
+书名、作者数组、语言、封面路径、标识符、出版社、出版日期、源文件名和 EPUB SHA-256 等
+产品查询所需元数据保存在共享书籍数据库记录中。首发不额外创建 `book_metadata.json`；
+规范化 HTML head 和 manifest document 只保存由同一次元数据提取结果生成的必要快照。
+
 `reading_manifest.json` 由程序从规范化 HTML 确定性生成，不使用 AI，不包含用户数据，
 可以随时删除并重新生成。它不能反推出完整 HTML，也不能成为第二份原文。
 
@@ -30,6 +34,9 @@ offset 不变；升级 Block 或 manifest 算法必须创建显式迁移，不�
 才能进入 ready。manifest 生成或资源校验失败都属于 `indexing` 失败。
 
 当前生成器原型为 [`../tools/build_reading_nodes.py`](../tools/build_reading_nodes.py)。
+该原型目前只生成 nodes，尚未输出本文 v0.2 要求的完整 `outline`、
+`tailoring_eligibility_version`、`tailoring_eligible` 和 `exclusion_reason`；这些属于实现前必须
+补齐的已知差距，不代表契约可选。
 
 ---
 
@@ -110,10 +117,27 @@ offset 是这份标准文本中的 UTF-16 code unit 位置，区间使用左闭�
 ```json
 {
   "version": "reading-nodes-1.0",
+  "tailoring_eligibility_version": "tailoring-eligibility-1.0",
   "document": {
     "title": "哲学研究",
     "language": "zh-CN"
   },
+  "outline": [
+    {
+      "section_id": "part-001",
+      "data_type": "part",
+      "title": "第一部分",
+      "parent_section_id": null,
+      "first_node_order": 1
+    },
+    {
+      "section_id": "sub-0001",
+      "data_type": "subsection",
+      "title": "§1",
+      "parent_section_id": "part-001",
+      "first_node_order": 1
+    }
+  ],
   "nodes": [
     {
       "section_id": "sub-0001",
@@ -124,7 +148,9 @@ offset 是这份标准文本中的 UTF-16 code unit 位置，区间使用左闭�
       "title": "§1",
       "parent_section_id": "part-001",
       "character_count": 789,
-      "block_count": 4
+      "block_count": 4,
+      "tailoring_eligible": true,
+      "exclusion_reason": null
     }
   ]
 }
@@ -132,6 +158,31 @@ offset 是这份标准文本中的 UTF-16 code unit 位置，区间使用左闭�
 
 manifest 不复制节点 HTML。运行时根据 `section_id + segment` 从规范化 HTML 提取对应
 的连续原文。阅读器、内容生成器、进度、问 AI 和用户笔记必须使用同一份 manifest。
+
+`outline` 从规范化 HTML 的完整 `section[data-type]` 树确定性生成，包含没有自身正文节点的
+纯分组 section。`first_node_order` 指向该 section 自身或首个后代的第一个阅读节点，用于连续
+滚动阅读器的目录跳转。它是产品导航索引，不修改或伪造原书的 TOC；原 EPUB TOC 仍只由
+规范化 HTML 中的 `nav[data-role="toc"]` 表达。
+
+### 3.1 裁读资格 v1
+
+裁读资格是产品硬边界，不是 AI 对内容价值的判断。v1 只有同时满足以下条件的节点具有资格：
+
+1. `region = bodymatter`。
+2. `data_type` 为 `chapter`、`section` 或 `subsection`。
+3. 节点至少包含一个具有可见文本的标准文本 block。
+
+不满足时保存 `tailoring_eligible = false` 和稳定、可枚举的 `exclusion_reason`，例如
+`non_bodymatter`、`excluded_data_type` 或 `no_text_block`。前言、导论、序章、附录、后记、
+结语、书目、索引、顶层区域直接正文和 `part` 自身 segment 即使包含大量文字，也不具有
+裁读资格。
+
+资格由 manifest 生成程序计算，书籍分析 Agent 和个性化策略均无权修改。没有资格的节点不
+创建导读、裁读注或节后助读生成任务，但仍参与原文加载、连续滚动、进度、目录定位、划线、
+笔记和问 AI。
+
+资格规则必须有独立版本。改变资格规则时创建显式迁移，不能在已有试读、节点增强和阅读历史
+的书籍包上静默重算。
 
 源 EPUB 的 TOC 可能只到部或章，不能单独充当阅读节点清单。阅读节点按完整规范化
 section 树和正文顺序生成，TOC 仍只表达源书实际提供的导航结构。
@@ -171,20 +222,27 @@ Range 的起点和终点放在不同文本节点中，因此划线可以跨越 `
 
 节点内容生成使用普通 OpenAI 兼容模型调用，不使用 Agent。每次调用输入至少包括：
 
-试读样章与正式阅读节点必须执行同一个固定生成脚本，使用同一套 prompt 模板、模型调用、
-输出 schema、quote 到 UTF-16 range 的锚点解析、结果校验、重试和缓存实现。不得存在样章
-专用生成器。`generation_scope` 只能决定允许引用哪类策略版本及缓存命名空间，不能改变
-裁读内容的生成逻辑或质量标准。
+试读片段与正式阅读节点必须执行同一个固定生成脚本，使用同一套 prompt 模板、模型调用、
+输出 schema、quote 到 UTF-16 range 的锚点解析、结果校验、重试和缓存实现。不得存在试读
+专用生成器。`generation_scope` 只能决定输入原文范围、允许引用哪类策略版本及缓存命名空间，
+不能改变裁读内容的生成逻辑或质量标准。
 
-- 当前节点的结构化 HTML
-- 当前节点的 block 标准文本
+- 当前节点位置和生成范围；`trial` 为节点内连续 block range，`formal` 为完整节点
+- 生成范围内的结构化 HTML
+- 生成范围内的 block 标准文本；block index 仍使用完整节点中的稳定编号
 - 当前节点相关原书注释
-- 上级标题和必要的相邻节点摘要
+- 上级标题
+- 上一个可裁读节点末尾和下一个可裁读节点开头的受限原文；截取的 block 数或字符数由程序
+  的版本化配置决定，不能由模型扩大范围
 - `book_profile.json`
 - `reader_profile.json`
 - `book_reader_profile.json`
 - `generation_scope = trial` 时，使用用户已批准用于试读的 `strategy_draft_version`
 - `generation_scope = formal` 时，使用最终生效的 `strategy_version`
+
+试读片段不能跨阅读节点。每个片段保存 `section_id + segment + range`，range 起止点使用与
+用户划线相同的 `block_index + UTF-16 offset` 模型。模型生成的裁读注只能锚定片段范围内原文。
+导读和节后助读描述本次片段，不得伪装成对完整章节的处理结果。
 
 首发不为不同节点设置处理强度。导读、裁读注、节后助读是全书统一支持的三种内容；
 某项对当前节点没有价值时，模型返回 `null` 或空数组。
@@ -305,6 +363,8 @@ normalized-book/
 ## 9. 阅读器要求
 
 - 原文和 AI 内容分层保存，AI 内容不得写回规范化 HTML
+- 正式阅读器采用连续滚动，按 manifest 节点顺序加载原文，不使用单节点翻页作为首发模式
+- 用户可以通过 outline 任意跳转到全书位置，不设置顺序解锁；目标增强未完成时先显示纯原文
 - 导读位于节点原文之前，节后助读位于原文之后，默认展开
 - 原书注和裁读注在原文对应位置触发展开，并明确区分来源
 - 阅读进度只按 manifest 中的原书位置计算，不计 AI 内容
