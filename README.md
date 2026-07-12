@@ -1,5 +1,11 @@
 # read-tailor-cli
 
+> **产品方向说明（2026-07-12）**：本 README 描述的是早期 Rust CLI 原型，
+> 不再代表当前网页产品的实现范围。当前产品流程、MVP 边界和 Agent 分工以
+> [`docs/product_mvp_plan.md`](docs/product_mvp_plan.md) 为准；书籍规范化产物以
+> [`docs/normalized_book_spec.md`](docs/normalized_book_spec.md) 为准；阅读节点、精确锚点和
+> 阅读器数据以 [`docs/reading_contract.md`](docs/reading_contract.md) 为准。
+
 一个基于 Rust 的 CLI，用来把 EPUB 转成更适合阅读的 HTML。
 
 当前版本已经实现了 PRD 的 MVP 主流程骨架：

@@ -14,6 +14,7 @@ import re
 import sys
 from collections import Counter, defaultdict
 from typing import Optional
+from urllib.parse import unquote
 
 from bs4 import BeautifulSoup, NavigableString, Tag
 
@@ -73,6 +74,16 @@ JUNK_CLASS_PATTERNS = (
     re.compile(r"^page_?break"),
 )
 TABLE_FORBIDDEN_ATTRS = {"width", "height", "bgcolor", "align", "valign", "style", "border", "cellpadding", "cellspacing"}
+
+# 书籍包内所有二进制媒体统一使用 assets/... 逻辑路径。
+MEDIA_RESOURCE_ATTRS = (
+    ("img", "src"),
+    ("audio", "src"),
+    ("video", "src"),
+    ("video", "poster"),
+    ("source", "src"),
+    ("track", "src"),
+)
 
 HN_RE = re.compile(r"^h[1-6]$")
 
@@ -158,6 +169,39 @@ def is_id_jump_span(el: Tag) -> bool:
     return el.name in ("span", "a") and el.get("id") and not el.get_text(strip=True) and not list(el.children)
 
 
+def asset_reference_error(value: str) -> Optional[str]:
+    """返回不合规原因；None 表示是安全、规范的 assets/... 包内路径。"""
+    ref = value.strip()
+    if not ref:
+        return "资源路径不能为空"
+
+    decoded = unquote(ref)
+    lowered = decoded.lower()
+    if any(ord(char) < 32 or ord(char) == 127 for char in decoded):
+        return "资源路径不得包含控制字符"
+    if lowered.startswith("data:"):
+        return "禁止 data URI；媒体必须保存为 assets/ 下的文件"
+    if lowered.startswith(("http://", "https://", "//")):
+        return "禁止外部或协议相对 URL；媒体必须使用 assets/... 包内路径"
+    if re.match(r"^[a-z][a-z0-9+.-]*:", decoded, re.I):
+        return "禁止带 URI scheme 的资源地址；媒体必须使用 assets/... 包内路径"
+    if decoded.startswith(("/", "\\")) or re.match(r"^[a-z]:[\\/]", decoded, re.I):
+        return "禁止宿主机绝对路径；媒体必须使用 assets/... 包内路径"
+    if "\\" in decoded:
+        return "资源路径必须使用正斜杠 /"
+    if "?" in decoded or "#" in decoded:
+        return "资源路径不得包含查询参数或片段"
+
+    parts = decoded.split("/")
+    if not decoded.startswith("assets/"):
+        return "媒体资源路径必须以 assets/ 开头"
+    if any(part in ("", ".", "..") for part in parts):
+        return "资源路径不得包含空段、. 或 .."
+    if len(parts) < 2:
+        return "资源路径必须指向 assets/ 下的具体文件"
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Linter
 # ---------------------------------------------------------------------------
@@ -191,6 +235,7 @@ class NbBookLinter:
         self.check_id_uniqueness()
         self.check_id_prefix_convention()
         self.check_sections_and_headings()
+        self.check_section_parent_boundaries()
         self.check_container_hierarchy_monotonic()
         self.check_leaf_type_no_children()
         self.check_sibling_type_consistency()
@@ -198,6 +243,7 @@ class NbBookLinter:
         self.check_br_abuse()
         self.check_hr_stripped()
         self.check_images()
+        self.check_media_resource_paths()
         self.check_figures()
         self.check_tables()
         self.check_lists_and_toc()
@@ -270,6 +316,8 @@ class NbBookLinter:
                     self.log_error("main 下的 <nav> data-role 必须为 'toc'", child)
                 else:
                     seen_roles.append("toc")
+                if not child.get("id"):
+                    self.log_error("顶层 nav[data-role=\"toc\"] 缺失必需的稳定 id", child)
             elif child.name == "section":
                 role = child.get("data-role")
                 if role not in TOP_ROLES:
@@ -278,6 +326,11 @@ class NbBookLinter:
                     )
                 else:
                     seen_roles.append(role)
+                if not child.get("id"):
+                    self.log_error(
+                        f"顶层 section[data-role={role!r}] 缺失必需的稳定 id",
+                        child,
+                    )
             else:
                 self.log_error(
                     f"main 的直接子节点只允许为 <section> 或 <nav>，发现 <{child.name}>",
@@ -374,6 +427,9 @@ class NbBookLinter:
                 self.log_error("章节 <section> 缺失必需的 data-type 属性", sec)
                 continue
 
+            if not sec.get("id"):
+                self.log_error("章节 <section data-type> 缺失必需的稳定 id", sec)
+
             if d_type not in ALL_DATA_TYPES:
                 self.log_warning(
                     f"data-type={d_type!r} 不在 §4.1 词表内（若确有必要请在实现中记录）",
@@ -443,6 +499,28 @@ class NbBookLinter:
                         )
                     break
                 cur = cur.parent
+
+    def check_section_parent_boundaries(self) -> None:
+        """§4.1：结构性 section 必须直接形成目录树，不得藏在排版 wrapper 中。"""
+        content_roles = {"frontmatter", "bodymatter", "backmatter"}
+        for sec in self.soup.find_all("section", attrs={"data-type": True}):
+            parent = sec.parent
+            if not isinstance(parent, Tag) or parent.name != "section":
+                self.log_error(
+                    "结构性 <section data-type> 必须直接位于父 section 下；"
+                    "不得包在 div/span/unknown 等中间 wrapper 内",
+                    sec,
+                )
+                continue
+
+            if parent.get("data-type") or parent.get("data-role") in content_roles:
+                continue
+
+            self.log_error(
+                "结构性 <section data-type> 的直接父级必须是另一个 "
+                "section[data-type] 或 frontmatter/bodymatter/backmatter 区域",
+                sec,
+            )
 
     def check_leaf_type_no_children(self) -> None:
         """§4.1：叶节点型章节不得再嵌套子章节。"""
@@ -554,6 +632,26 @@ class NbBookLinter:
                         f"alt={alt!r} 疑似 ingester 生成的占位描述；规范要求"
                         f"'源有则原样保留、源无则不加 alt 属性'（§5）",
                         img,
+                    )
+
+    def check_media_resource_paths(self) -> None:
+        """§5：所有媒体都必须引用安全、稳定的 assets/... 包内路径。"""
+        for tag_name, attr_name in MEDIA_RESOURCE_ATTRS:
+            for node in self.soup.find_all(tag_name):
+                if not node.has_attr(attr_name):
+                    if tag_name in {"img", "source"} and attr_name == "src":
+                        self.log_error(
+                            f"<{tag_name}> 缺失必需的 {attr_name} 属性",
+                            node,
+                        )
+                    continue
+                value = str(node.get(attr_name) or "")
+                reason = asset_reference_error(value)
+                if reason:
+                    shown = value if len(value) <= 120 else value[:117] + "…"
+                    self.log_error(
+                        f"<{tag_name} {attr_name}={shown!r}> 不符合资源规范：{reason}",
+                        node,
                     )
 
     def check_figures(self) -> None:
@@ -828,12 +926,12 @@ class NbBookLinter:
                 )
 
     def check_empty_wrappers(self) -> None:
-        """§15.2 / §15.5：无语义空壳。"""
-        # 无属性无 role 的 <div>/<span>
+        """§15.2 / §15.5：无语义 wrapper 与空元素。"""
+        # 无属性 div/span 即使包含正文也只是排版壳，必须剥除但保留子内容。
         for tag in self.soup.find_all(["div", "span"]):
-            if not tag.attrs and not tag.get_text(strip=True) and not tag.find(True):
+            if not tag.attrs:
                 self.log_error(
-                    f"无语义无内容的空 <{tag.name}> 空壳，必须剥除",
+                    f"无任何属性的 <{tag.name}> 不承载语义，必须剥壳并保留内部内容",
                     tag,
                 )
 

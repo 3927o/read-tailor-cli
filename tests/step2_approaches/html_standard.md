@@ -1,5 +1,8 @@
 # 统一规范 HTML (Unified Standard HTML) 描述文档
 
+> **DEPRECATED：本文件是早期实验规范，已弃置，不得用于生成或验收产品书籍包。**
+> 现行唯一规范为 [`../../docs/normalized_book_spec.md`](../../docs/normalized_book_spec.md)。
+
 ## 0. 核心原则 (Core Principles)
 * **绝对的语义化**：只使用 HTML5 语义标签。**遇到无意义的包裹性 `<div>` 和 `<span>` 时，必须剥离这些标签，但强制保留其内部的文本和有效子元素**。
 * **表现与内容彻底分离**：**严禁**任何内联样式（`style="..."`）。所有视觉呈现必须通过预定义的 `class` 配合外部 CSS 解决。

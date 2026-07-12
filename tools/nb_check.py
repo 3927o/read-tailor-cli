@@ -1,15 +1,16 @@
-"""nb-1.0 产物统一校验入口（结构层 + 保真层）。
+"""nb-1.0 产物统一校验入口（结构层 + 包资源层 + 保真层）。
 
 用法：
-    python tools/nb_check.py book.html                        # 仅结构层
-    python tools/nb_check.py book.html --baseline book.epub   # 结构层 + 保真层
+    python tools/nb_check.py book.html                        # 结构层 + 包资源层
+    python tools/nb_check.py book.html --baseline book.epub   # 三层完整校验
 
-两层分工：
+三层分工：
 - 结构层（永远跑）：产物自身是否符合 docs/normalized_book_spec.md 的结构规则。
   规则实现在同目录 nb_linter.py。
+- 包资源层（永远跑）：assets/... 路径安全且引用文件真实存在。
 - 保真层（提供 --baseline 时跑）：产物相对源 EPUB 有没有丢内容。
   * char_recall  —— 可见字符召回率（阈值 ≥99.9%），并逐条列出丢失片段（diff）
-  * img_recall   —— 图片按字节哈希做多重集守恒（同一张图用 3 次丢 1 次也能抓到）
+  * img_recall   —— assets 图片按字节哈希做多重集守恒（同一张图用 3 次丢 1 次也能抓到）
   * note 守恒    —— EPUB 里的 epub:type noteref/footnote 数 ↔ 产物 noteref/note 数
   * TOC 对账     —— EPUB nav 文档条目数 ↔ 产物 nav[data-role=toc] 条目数
 
@@ -21,7 +22,6 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import difflib
 import hashlib
 import html as html_mod
@@ -32,14 +32,20 @@ import sys
 import warnings
 import zipfile
 from collections import Counter
+from pathlib import Path
 from typing import Optional
+from urllib.parse import unquote
 
 from bs4 import BeautifulSoup, Tag, XMLParsedAsHTMLWarning
 
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from nb_linter import NbBookLinter, css_path  # noqa: E402
+from nb_linter import (  # noqa: E402
+    MEDIA_RESOURCE_ATTRS,
+    NbBookLinter,
+    asset_reference_error,
+)
 
 WS_RE = re.compile(r"\s+")
 CHAR_RECALL_THRESHOLD = 0.999
@@ -198,13 +204,73 @@ class EpubBaseline:
 
 
 # ---------------------------------------------------------------------------
+# 包资源层
+# ---------------------------------------------------------------------------
+
+def resolve_asset_path(package_root: Path, reference: str) -> Optional[Path]:
+    """把已通过语法校验的 assets/... 引用解析为包内文件路径。"""
+    if asset_reference_error(reference):
+        return None
+    root = package_root.resolve()
+    target = (root / unquote(reference.strip())).resolve()
+    try:
+        common = os.path.commonpath((str(root), str(target)))
+    except ValueError:
+        return None
+    return target if common == str(root) else None
+
+
+class AssetChecker:
+    def __init__(self, product_soup: BeautifulSoup, product_path: str):
+        self.product = product_soup
+        self.product_path = Path(product_path).resolve()
+        self.package_root = self.product_path.parent
+        self.errors: list[str] = []
+        self.warnings: list[str] = []
+        self.metrics: dict[str, object] = {}
+
+    def run(self) -> None:
+        checked = 0
+        unique_files: set[Path] = set()
+        for tag_name, attr_name in MEDIA_RESOURCE_ATTRS:
+            for node in self.product.find_all(tag_name):
+                if not node.has_attr(attr_name):
+                    continue
+                reference = str(node.get(attr_name) or "")
+                if asset_reference_error(reference):
+                    # 具体路径语法错误由结构层报告；这里不重复。
+                    continue
+                checked += 1
+                target = resolve_asset_path(self.package_root, reference)
+                if target is None:
+                    self.errors.append(
+                        f"[资源越界] {tag_name}.{attr_name}={reference!r} 无法安全解析到书籍包内"
+                    )
+                    continue
+                unique_files.add(target)
+                if not target.is_file():
+                    self.errors.append(
+                        f"[资源缺失] {tag_name}.{attr_name}={reference!r} 对应文件不存在"
+                    )
+
+        self.metrics["asset_references"] = checked
+        self.metrics["asset_files"] = len(unique_files)
+
+
+# ---------------------------------------------------------------------------
 # 保真层
 # ---------------------------------------------------------------------------
 
 class FidelityChecker:
-    def __init__(self, product_soup: BeautifulSoup, baseline: EpubBaseline):
+    def __init__(
+        self,
+        product_soup: BeautifulSoup,
+        baseline: EpubBaseline,
+        package_root: Path,
+    ):
         self.product = product_soup
         self.baseline = baseline
+        self.package_root = package_root.resolve()
         self.errors: list[str] = []
         self.warnings: list[str] = []
         self.metrics: dict[str, object] = {}
@@ -289,24 +355,17 @@ class FidelityChecker:
         epub_counts, epub_locs = self.baseline.image_refs()
 
         prod_counts: Counter = Counter()
-        external = 0
         for img in self.product.find_all("img"):
             src = img.get("src") or ""
-            if src.startswith("data:"):
-                try:
-                    payload = src.split(",", 1)[1]
-                    data = base64.b64decode(payload)
-                except Exception:
-                    self.warnings.append(f"[图片] data URI 解码失败: {src[:60]}…")
-                    continue
-                prod_counts[hashlib.md5(data).hexdigest()] += 1
-            elif src:
-                external += 1
-
-        if external:
-            self.warnings.append(
-                f"[图片] 产物有 {external} 个非 data URI 的 <img src>（无法做哈希守恒对账）"
-            )
+            target = resolve_asset_path(self.package_root, str(src))
+            if target is None or not target.is_file():
+                continue  # 路径不合法或文件缺失由结构层/包资源层报告。
+            try:
+                data = target.read_bytes()
+            except OSError as exc:
+                self.errors.append(f"[图片读取失败] {src!r}: {exc}")
+                continue
+            prod_counts[hashlib.md5(data).hexdigest()] += 1
 
         total_epub = sum(epub_counts.values())
         total_prod = sum(prod_counts.values())
@@ -320,6 +379,14 @@ class FidelityChecker:
                 self.errors.append(
                     f"[图片丢失] 同一图片（md5={h[:10]}…）源中引用 {n_epub} 次、"
                     f"产物仅 {n_prod} 次；源引用位置: {locs}"
+                )
+
+        for h, n_prod in prod_counts.items():
+            n_epub = epub_counts.get(h, 0)
+            if n_prod > n_epub:
+                self.warnings.append(
+                    f"[图片新增或重复] 同一图片（md5={h[:10]}…）源中引用 {n_epub} 次、"
+                    f"产物引用 {n_prod} 次"
                 )
 
     # ---- note 守恒 ---------------------------------------------------------------
@@ -385,6 +452,7 @@ def main() -> int:
 
     with open(args.product, encoding="utf-8") as f:
         product_html = f.read()
+    product_soup = BeautifulSoup(product_html, "html.parser")
 
     # ---- 结构层 ----
     linter = NbBookLinter(product_html)
@@ -397,6 +465,21 @@ def main() -> int:
         print(w)
     print(f"结构层小计：{len(struct['errors'])} error / {len(struct['warnings'])} warning")
 
+    # ---- 包资源层 ----
+    assets = AssetChecker(product_soup, args.product)
+    assets.run()
+    print()
+    print("════════ 包资源层（assets 文件检查） ════════")
+    for e in assets.errors:
+        print("[错误] " + e)
+    for w in assets.warnings:
+        print("[警告] " + w)
+    print(
+        f"资源引用 {assets.metrics.get('asset_references', 0)} 次 / "
+        f"实际文件 {assets.metrics.get('asset_files', 0)} 个"
+    )
+    print(f"包资源层小计：{len(assets.errors)} error / {len(assets.warnings)} warning")
+
     fid_errors: list[str] = []
     fid_warnings: list[str] = []
 
@@ -406,7 +489,7 @@ def main() -> int:
         print("════════ 保真层（对源 EPUB 守恒对账） ════════")
         if args.baseline.lower().endswith(".epub"):
             baseline = EpubBaseline(args.baseline)
-            fc = FidelityChecker(BeautifulSoup(product_html, "html.parser"), baseline)
+            fc = FidelityChecker(product_soup, baseline, assets.package_root)
             fc.run()
             fid_errors, fid_warnings = fc.errors, fc.warnings
             for e in fid_errors:
@@ -429,8 +512,8 @@ def main() -> int:
         print("  终验请带上源 EPUB：nb_check.py <product.html> --baseline <book.epub>")
 
     # ---- 汇总 ----
-    n_err = len(struct["errors"]) + len(fid_errors)
-    n_warn = len(struct["warnings"]) + len(fid_warnings)
+    n_err = len(struct["errors"]) + len(assets.errors) + len(fid_errors)
+    n_warn = len(struct["warnings"]) + len(assets.warnings) + len(fid_warnings)
     print()
     print(f"—— 总计：{n_err} 个错误，{n_warn} 个警告 ——")
     if n_err:

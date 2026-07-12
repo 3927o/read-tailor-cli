@@ -4,8 +4,14 @@
 两条路线**共用同一个后端 plan7**（`plan_7_program_first.py`），区别只在**前端**
 ——怎么把 EPUB 变成喂给 plan7 的那份 `raw.html`。
 
-- **方法 A：pandoc 前端**（生产验证过、能内嵌图片）
-- **方法 B：direct 前端**（不经 pandoc、结构更忠实、但目前不内嵌图片）
+- **方法 A：pandoc 前端**（实验验证过；当前中间文件会内嵌图片）
+- **方法 B：direct 前端**（不经 pandoc、结构更忠实；当前中间文件也会内嵌图片）
+
+> **注意：本文是 plan7 spike 的操作记录，不是现行产品规范。** 这些实验命令仍会在中间
+> HTML 中生成 Base64 data URI；正式产物必须把媒体拆到 `assets/`，HTML 使用
+> `assets/...` 相对路径，并通过包级资源校验。相关代码完成前，本流程的输出不能直接进入
+> 产品 ready 状态。现行规范以 [`../../docs/normalized_book_spec.md`](../../docs/normalized_book_spec.md)
+> 为准。
 
 > 背景与设计动机见 [`experiment_log.md`](experiment_log.md)；本文只讲“怎么做”。
 
@@ -65,8 +71,8 @@ cd <repo>/tests/step2_approaches
 
 ### 步骤 A1：pandoc 转 raw.html
 
-参数与 Rust 管道 `step1_convert_epub` 完全一致（`-s --embed-resources` 会把图片
-base64 内嵌）：
+参数与 Rust 管道 `step1_convert_epub` 完全一致。这里的 `-s --embed-resources` 会把图片
+以 Base64 放进**中间文件**；后续产品打包步骤必须将其提取到 `assets/` 并改写引用：
 
 ```bash
 export BOOK_NAME="你的书名"
@@ -184,7 +190,7 @@ PY
 
 ### ⚠️ direct 前端目前的局限（spike，未生产化）
 
-- **不内嵌图片** —— 图多的书会丢图。图重的书用方法 A。
+- 目前仍把图片内嵌到中间 HTML，尚未直接产出产品要求的 `assets/` 书籍包。
 - **未做 EPUB2 / NCX 老式目录** 的鲁棒处理。
 - **不带 CSS**。
 - 会暴露一个 plan7 已知 bug：重建标题树时**丢标题 id**，导致 EPUB 自带的目录/标题
@@ -221,7 +227,7 @@ PY
 
 | 场景 | 选 | 原因 |
 |---|---|---|
-| 图文并茂、图片重要 | **方法 A（pandoc）** | 只有它内嵌图片 |
+| 图文并茂、图片重要 | **方法 A（pandoc）** | EPUB 兼容性验证更多；但仍需后续拆分为 `assets/` |
 | 跨文件 rearnote 注释的书 | **方法 A + epub_recover** | recover 专治这个 pandoc bug |
 | EPUB 文件 `<title>` 是垃圾（“未知”等） | 方法 A，但**跳过 recover 的标题注入**（回滚 .bak） | 避免注入噪声章节 |
 | 纯文本、想要最忠实的链接/目录 | **方法 B（direct）** | 零恢复代码，目录/标题链全保留 |

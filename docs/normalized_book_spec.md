@@ -89,6 +89,7 @@
 
 - `bodymatter` 是唯一必需的顶层区域；其他四项按源文档实际情况选择性生成，不得凭空捏造。
 - 若源文档没有目录，**不得**自动生成 TOC；`data-role="toc"` 只用于反映源里已有的目录结构。
+- 所有实际存在的顶层 `nav` / `section` 必须带稳定且全局唯一的 `id`。
 
 ---
 
@@ -123,6 +124,10 @@ book ⊃ part ⊃ chapter ⊃ section ⊃ subsection
 ```
 
 嵌套时**必须**从粗到细单调下降；允许跳过中间层级（如 `part` 直接嵌 `section` 可以），但反向嵌套（如 `chapter` 里嵌 `part`）严禁。
+
+**结构性子章节必须是父章节的直接子元素。**`section[data-type]` 的直接父级只能是另一个
+`section[data-type]`，或 `frontmatter` / `bodymatter` / `backmatter` 顶层区域。不得为了
+保留源排版而把结构性 section 包在 `div`、`span` 或 `data-role="unknown"` 中间层里。
 
 **选择原则**：
 - 词表内**优先**使用语义最贴切的值。版权/出版信息用 `colophon`、题记用 `epigraph`、扉页用 `titlepage`、他人所写的前言用 `foreword`、作者自己的前言用 `preface`——**不得**因为省事统一用 `chapter`。
@@ -172,6 +177,9 @@ book ⊃ part ⊃ chapter ⊃ section ⊃ subsection
 
 ### 4.3 章节 id 命名
 
+**每个 `section[data-type]` 都必须带稳定 id。**下游阅读节点、目录定位、进度和精确锚点
+均以 section id 为基础，不能依赖标题文本或临时 DOM 路径。
+
 **id 全局唯一**：文档内所有 `id` **必须**全局唯一。虽然这是 HTML 硬性要求，但因跨格式 ingester 常在不同层各自机械命名导致冲突，本规范再次强调。
 
 **命名规则**：
@@ -218,7 +226,7 @@ book ⊃ part ⊃ chapter ⊃ section ⊃ subsection
 
 ```html
 <figure data-role="figure" id="fig-001">
-  <img src="…" alt="[源原样保留；源无 alt 时省略此属性]">
+  <img src="assets/fig-001.png" alt="[源原样保留；源无 alt 时省略此属性]">
   <figcaption>可选的图注</figcaption>
 </figure>
 ```
@@ -233,9 +241,23 @@ book ⊃ part ⊃ chapter ⊃ section ⊃ subsection
 
 **其他规则**：
 - 若源有图注，必须转成 `<figcaption>` 置于 `<img>` 之下。多段图注允许在 `<figcaption>` 内使用 `<p>`。
-- **不得截断**任何 `src`（含 base64 data URI）。
-- 图片 `src` 优先内嵌 data URI；ingester 无法内嵌时可保留相对路径，并在图片节点上加 `data-src-external="true"`。
+- **不得截断或擅自改写**任何资源路径。
+- 网页产品书籍包必须把图片及其他媒体保存到 `assets/` 目录，HTML 使用 `assets/...`
+  相对路径。规范化产物不得包含 data URI。
+- 资源路径不得使用宿主机绝对路径，不得包含逃出书籍包根目录的 `..`，不得把临时签名 URL
+  固化进规范化 HTML。相对资源必须在书籍包发布前验证实际存在。
+- `<audio>` / `<video>` / `<source>` / `<track>` 的本地媒体 `src`，以及 `<video>` 的
+  `poster`，使用相同的 `assets/...` 规则。
 - 图片顺序编号：`fig-001`、`fig-002`…；若源有稳定 id，保留。
+
+规范化书籍包的最小目录结构为：
+
+```text
+normalized-book/
+├── book.normalized.html
+└── assets/
+    └── ...
+```
 
 ---
 
@@ -464,7 +486,9 @@ code lines
 以下规则对全体规范化 HTML 有效，不管出现在哪一节：
 
 1. **严禁** inline `style="…"` —— ingester 必须剥离全部内联样式。
-2. **严禁**无语义包裹 `<div>` / `<span>`（无任何 attr、也不承载 role/type）—— 必须剥壳、保留内部内容。
+2. **严禁**无语义包裹 `<div>` / `<span>`。任何无属性的 `div` / `span`，即使内部含有
+   可见正文，也必须剥壳并原样保留其内部内容；带有明确 `data-role`、`id`、有效样式挂钩
+   或行内语义的容器不在此列。
 3. **必须**清洗源转换工具带的冗余 class（如 pandoc 的 `calibre*`、`sgc*`；docx 的 `mso-*`；等）。样式 class 只保留 ingester 主动想留的。
 4. **严禁**在规范化产物里出现源工具的 XML 命名空间前缀（如 `epub:type`、`opf:*`、`ncx:*`），有需要一律翻译成 `data-*`。
 5. **严禁**空 `<a>`、空 `<p>`（见 §4.4 的完整定义）、空 `<li>`、空 `<td>`（除非它是 id 跳板 `<span id="…"></span>`）。
@@ -487,11 +511,13 @@ code lines
 - [ ] 无 hN 跳级（§4.2）。
 - [ ] 词表选值贴近语义（不用 `chapter` 装版权页/题记/前言等）（§4.1）。
 - [ ] 容器型嵌套单调从粗到细（`book ⊃ part ⊃ chapter ⊃ section ⊃ subsection`）（§4.1）。
+- [ ] 结构性子 section 直接位于父 section 下，未藏在 `div`/`span`/`unknown` wrapper 中（§4.1）。
 - [ ] **同一父下的平级兄弟容器使用同一 `data-type`**（§4.2.1）。
 - [ ] **同一书内的同类原子单元用同一建模方式和同一 DOM 深度**（§4.2.2）。
 - [ ] 编号评论等重复原子单元按 §4.2.3 处理（各自独立成 section 或 `<div data-role="unit">`；不得当兄弟 hN）。
 
 **id**
+- [ ] 所有顶层区域和每个 `section[data-type]` 均有稳定 id（§3、§4.3）。
 - [ ] **所有 `id` 全局唯一**（§4.3、§15.7）。
 - [ ] id 按 `data-type` 分家命名，前缀不跨类型复用（§4.3）。
 
@@ -510,10 +536,12 @@ code lines
 - [ ] 内锚点全部可解析，或 `data-broken="true"` 明标（§12.2）。
 
 **清洁度**
-- [ ] 无 inline style；无 pandoc/calibre/mso 冗余 class；无 `<b>`/`<i>`；无 `<script>`/`<style>`/`<iframe>`；无 epub:/opf: 命名空间残留（§15）。
+- [ ] 无属性 `div`/`span` 已剥壳；无 inline style；无 pandoc/calibre/mso 冗余 class；无 `<b>`/`<i>`；无 `<script>`/`<style>`/`<iframe>`；无 epub:/opf: 命名空间残留（§15）。
 
 **内容保真**
 - [ ] 信心不足处用 `<div data-role="unknown">` 兜底而非删除（§14）。
+- [ ] 媒体引用均为安全的 `assets/...` 路径，文件真实存在，并通过源 EPUB 资源守恒对账；
+      规范化产物中不存在 data URI（§5）。
 - [ ] `char_recall`（输出可见字符 / 源可见字符）≥ 99.9%。
 
 ---

@@ -1,5 +1,10 @@
 # PRD v0.1：基于 AI 的书籍阅读体验优化 CLI
 
+> **历史文档**：本文记录早期 CLI 原型需求，已不再作为当前产品 PRD。
+> 当前网页产品方向见 [`product_mvp_plan.md`](product_mvp_plan.md)，规范化产物契约见
+> [`normalized_book_spec.md`](normalized_book_spec.md)，阅读节点和精确锚点契约见
+> [`reading_contract.md`](reading_contract.md)。
+
 ## 1. 产品目标
 
 做一个 CLI 工具，帮助用户把 EPUB 书籍转换并处理成**更适合其个人阅读目标**的 HTML 阅读版本。
